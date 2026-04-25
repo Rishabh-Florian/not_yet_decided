@@ -1,0 +1,17 @@
+# Progress Log
+
+## Session [DATE]
+
+### Current Status
+- Branch: [BRANCH_NAME]
+- Backend: [PORT] | Frontend: [PORT]
+
+Example Entry: Fixed PRD item #3: Changed xyz
+
+- first change
+- second change 
+...
+
+---
+
+Next Entry...

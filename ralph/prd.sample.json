@@ -1,0 +1,23 @@
+[
+    {
+        "category": "functional",
+        "description": "implement xyz feature",
+        "steps": [
+            "subfeature 1",
+            "subfeature 2",
+            "subfeature 3"
+        ],
+        "passes": false
+    },
+        {
+        "category": "ui",
+        "description": "implement xyz feature for frontend",
+        "steps": [
+            "subfeature 1",
+            "subfeature 2",
+            "subfeature 3",
+            "subfeature 4"
+        ],
+        "passes": false
+    }
+]

@@ -1,0 +1,9 @@
+# Progress Log
+
+## Session [DATE]
+
+### Status
+- Branch: [BRANCH]
+- Notes: [what was done, blockers, next steps]
+
+---

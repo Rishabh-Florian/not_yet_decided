@@ -1,0 +1,11 @@
+[
+    {
+        "category": "example",
+        "description": "Replace with your feature description",
+        "steps": [
+            "step 1",
+            "step 2"
+        ],
+        "passes": false
+    }
+]

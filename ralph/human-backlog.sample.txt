@@ -1,0 +1,11 @@
+# Claude Code Cockpit - Human Review Backlog
+
+This file should contain all work that could not be resolved by Claude on his own due to missing permissions or anything else that requires manual intervention.
+This Backlog makes sure necessary manual interventions do not get lost and the human can work on them later on while claude is still able to proceed.
+
+Example Entry:
+
+While working on feature xyz (reference to prd.json entry), I could not proceed with deployment as I need Cloudflare credentials 
+or did not have the permissions to authenticate, do xyz.
+
+---
