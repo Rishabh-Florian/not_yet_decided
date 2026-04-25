@@ -26,7 +26,7 @@ from backend.models.graph import GraphEdge, GraphNode, Provenance
 
 from . import runtime
 from .llm import GeminiClient, LLMError
-from .spec import EdgeRule, FieldMap, LLMExtraction, MappingSpec, NodeRule
+from .spec import FieldMap, LLMExtraction, MappingSpec, NodeRule
 from .store import IngestStore
 
 
@@ -100,14 +100,15 @@ class Ingestor:
         )
         report.run_id = run_id
 
+        status = "completed"
+        error: str | None = None
+
         try:
             for i, record in enumerate(self._iter_records(spec, path)):
                 if limit is not None and i >= limit:
                     break
                 report.records_in += 1
                 self._process_record(spec, record, run_id, report, dry_run)
-            status = "completed"
-            error = None
         except Exception as e:
             status = "failed"
             error = str(e)
@@ -230,7 +231,7 @@ class Ingestor:
                 spec, record, source_file, source_record_id, applied_nodes, dry_run
             )
 
-            if not dry_run:
+            if not dry_run and run_id is not None:
                 self._ingest.mark_seen(
                     spec_version=spec.spec_version,
                     source_file=source_file,
@@ -374,6 +375,7 @@ class Ingestor:
         input_value: Any,
         record: Any,
     ) -> list[dict[str, Any]]:
+        assert self._llm is not None
         cache_inputs = {p: runtime.resolve(p, record) for p in block.cache_key}
         list_schema = {
             "type": "array",

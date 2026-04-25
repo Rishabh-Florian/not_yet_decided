@@ -25,7 +25,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from . import runtime
-from .llm import GeminiClient, LLMError
+from .llm import GeminiClient
 from .spec import (
     CANONICAL_NODE_TYPES,
     CANONICAL_RELATION_TYPES,

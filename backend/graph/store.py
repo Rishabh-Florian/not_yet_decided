@@ -26,7 +26,7 @@ import sqlite3
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Iterable, Iterator
+from typing import Any, Iterable, Iterator, LiteralString, cast
 
 from neo4j import Driver, GraphDatabase
 
@@ -406,7 +406,7 @@ class GraphStore:
         try:
             with self._session() as s:
                 res = s.run(
-                    f"""MATCH (a:Entity {{id: $src}}), (b:Entity {{id: $tgt}})
+                    cast(LiteralString, f"""MATCH (a:Entity {{id: $src}}), (b:Entity {{id: $tgt}})
                         MERGE (a)-[r:{rel_type} {{id: $id}}]->(b)
                         ON CREATE SET
                             r.attributes_json = $attrs,
@@ -419,7 +419,7 @@ class GraphStore:
                             r.confidence = $conf,
                             r.valid_to = $vt,
                             r.version = coalesce(r.version, 0) + 1
-                        RETURN r""",
+                        RETURN r"""),
                     src=edge.source_node_id,
                     tgt=edge.target_node_id,
                     id=edge.id,
@@ -486,14 +486,14 @@ class GraphStore:
             return set()
         depth = int(depth)
         if relation_type is None:
-            cypher = (
+            cypher = cast(LiteralString,
                 f"MATCH (n:Entity {{id: $id}})-[*1..{depth}]-(m:Entity) "
                 f"WHERE m.id <> $id "
                 f"RETURN DISTINCT m.id AS id"
             )
         else:
             rel = _validate_rel_type(relation_type)
-            cypher = (
+            cypher = cast(LiteralString,
                 f"MATCH (n:Entity {{id: $id}})-[:{rel}*1..{depth}]-(m:Entity) "
                 f"WHERE m.id <> $id "
                 f"RETURN DISTINCT m.id AS id"
@@ -503,7 +503,7 @@ class GraphStore:
 
     def shortest_path(self, source: str, target: str, max_hops: int = 6) -> list[str] | None:
         max_hops = int(max_hops)
-        cypher = (
+        cypher = cast(LiteralString,
             f"MATCH p = shortestPath((a:Entity {{id: $s}})-[*..{max_hops}]-(b:Entity {{id: $t}})) "
             f"RETURN [n IN nodes(p) | n.id] AS path"
         )
@@ -534,8 +534,10 @@ class GraphStore:
                 r["t"]: r["c"]
                 for r in s.run("MATCH ()-[r]->() RETURN type(r) AS t, count(*) AS c")
             }
-            node_count = s.run("MATCH (n:Entity) RETURN count(n) AS c").single()["c"]
-            edge_count = s.run("MATCH ()-[r]->() RETURN count(r) AS c").single()["c"]
+            node_rec = s.run("MATCH (n:Entity) RETURN count(n) AS c").single()
+            edge_rec = s.run("MATCH ()-[r]->() RETURN count(r) AS c").single()
+            node_count = node_rec["c"] if node_rec else 0
+            edge_count = edge_rec["c"] if edge_rec else 0
         prov_count = self._conn.execute("SELECT COUNT(*) FROM provenance").fetchone()[0]
         raw_count = self._conn.execute("SELECT COUNT(*) FROM source_records").fetchone()[0]
         return {

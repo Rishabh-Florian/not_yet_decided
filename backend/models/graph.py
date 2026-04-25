@@ -26,7 +26,7 @@ class SourceRecord:
     source_record_id: str                   # e.g. "email_id:4226322d-0ea5-..."
     raw_record: dict[str, Any]              # full original record, unmodified
     content_hash: str                       # sha256 hex of canonical JSON
-    ingested_at: datetime = field(default_factory=_now)
+    ingested_at: datetime | None = field(default_factory=_now)
 
 
 @dataclass
@@ -38,12 +38,12 @@ class Provenance:
     extraction_model: str           # e.g. "claude-sonnet-4-6" or "rule:email_parser_v1"
     confidence: float
     raw_value: str
-    extracted_at: datetime = field(default_factory=_now)
+    extracted_at: datetime | None = field(default_factory=_now)
     spec_version: int | None = None # MappingSpec version that produced this fact
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
-        d["extracted_at"] = self.extracted_at.isoformat()
+        d["extracted_at"] = self.extracted_at.isoformat() if self.extracted_at else None
         return d
 
     @classmethod
@@ -62,8 +62,8 @@ class GraphNode:
     confidence: float = 1.0
     vfs_path: str = ""
     id: str = field(default_factory=lambda: _new_id("node"))
-    created_at: datetime = field(default_factory=_now)
-    updated_at: datetime = field(default_factory=_now)
+    created_at: datetime | None = field(default_factory=_now)
+    updated_at: datetime | None = field(default_factory=_now)
     version: int = 1
 
     def touch(self) -> None:
