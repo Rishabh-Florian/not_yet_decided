@@ -1,0 +1,40 @@
+# Canonical type registry — the small soft schema that anchors heterogeneous
+# sources. MappingSpecs MUST resolve every node and edge type to one of these
+# (directly, or via canonical_aliases like "Email -> Message"). Edit this file
+# instead of writing code to add a new canonical type.
+
+node_types:
+  Person:
+    description: A human (employee, customer contact, vendor contact, ...)
+  Organization:
+    description: A company, business unit, vendor, customer org, department
+  Document:
+    description: A file, attachment, policy, repository readme, ...
+  Message:
+    description: An email, chat message, ticket comment, social post, ...
+  Event:
+    description: A meeting, transaction, ticket lifecycle event, ...
+  Asset:
+    description: A product, service, repository, account, hardware item
+  Topic:
+    description: A skill, category, project, theme — abstract groupings
+
+# Relation types. Each may carry attributes (date, channel, amount...) but
+# the *type* must be in this list. Names are valid Cypher identifiers.
+relation_types:
+  MEMBER_OF:        Person/Org belongs to a higher-level Organization
+  REPORTS_TO:       Person reports to Person
+  WORKS_ON:         Person actively contributes to a Topic / Asset
+  OWNS:             Person/Org owns an Asset / Document
+  AUTHORED:         Person authored a Document / Message
+  SENT:             Person -> Message (the producer side)
+  RECEIVED:         Message -> Person (the consumer side)
+  MENTIONS:         Message/Document references a Person/Org/Topic/Asset
+  PART_OF:          Asset/Document/Topic is part of another Asset/Topic
+  PURCHASED:        Person/Org purchased Asset (Event-like edge with date/amount)
+  ASSIGNED_TO:      Event/Message is assigned to a Person
+  TAGGED:           Anything is tagged with a Topic
+  RELATED_TO:       Generic association of last resort
+  SAME_AS:          Identity-resolution edge between two nodes that are the
+                    same real-world entity (kept distinct, not merged, so
+                    provenance survives)

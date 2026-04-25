@@ -94,6 +94,16 @@ class GraphStore:
     def _init_sqlite(self) -> None:
         with open(SCHEMA_PATH, "r") as f:
             self._conn.executescript(f.read())
+        # Idempotent column additions for older databases. SQLite has no
+        # IF NOT EXISTS for ADD COLUMN, so we catch the duplicate-column error.
+        for ddl in [
+            "ALTER TABLE provenance ADD COLUMN spec_version INTEGER",
+        ]:
+            try:
+                self._conn.execute(ddl)
+            except sqlite3.OperationalError as e:
+                if "duplicate column name" not in str(e).lower():
+                    raise
         self._conn.commit()
 
     def _init_neo4j(self) -> None:
@@ -198,26 +208,100 @@ class GraphStore:
     # ---------- node ops ----------
 
     def add_node(self, node: GraphNode) -> GraphNode:
-        with self._session() as s:
-            s.run(
-                """CREATE (n:Entity {
-                       id: $id, type: $type, attributes_json: $attrs,
-                       confidence: $conf, vfs_path: $vfs,
-                       created_at: $ca, updated_at: $ua, version: $v
-                   })""",
-                id=node.id,
-                type=node.type,
-                attrs=json.dumps(node.attributes),
-                conf=node.confidence,
-                vfs=node.vfs_path,
-                ca=_iso(node.created_at),
-                ua=_iso(node.updated_at),
-                v=node.version,
-            )
-        with self._tx() as c:
+        """Insert or merge a node by id. Scalar attribute conflicts = last-write-wins.
+
+        Provenance is appended (never replaces) so re-ingestion keeps the full
+        trace history. Asserts canonical-type equality on match — id collisions
+        across types (e.g. Person vs Organization for the same id) raise rather
+        than silently merge.
+
+        Atomicity: SQLite provenance is staged first, the Neo4j MERGE runs
+        next, then SQLite is committed. On Neo4j failure SQLite rolls back.
+        On SQLite-commit failure we delete the just-merged Neo4j node by id
+        so the two stores cannot diverge.
+        """
+        # Stage provenance. Python's sqlite3 auto-begins a transaction on the
+        # first write; rollback on any exception undoes those writes.
+        try:
             for p in node.provenance:
-                self._insert_provenance(c, p, node_id=node.id)
+                self._insert_provenance(self._conn, p, node_id=node.id)
+        except Exception:
+            self._conn.rollback()
+            raise
+
+        try:
+            with self._session() as s:
+                rec = s.run(
+                    """MERGE (n:Entity {id: $id})
+                       ON CREATE SET
+                           n.type = $type,
+                           n.attributes_json = $attrs,
+                           n.confidence = $conf,
+                           n.vfs_path = $vfs,
+                           n.created_at = $ca,
+                           n.updated_at = $ua,
+                           n.version = $v,
+                           n._was_created = 1
+                       ON MATCH SET
+                           n.attributes_json = $attrs,
+                           n.confidence = $conf,
+                           n.updated_at = $ua,
+                           n.version = coalesce(n.version, 0) + 1,
+                           n._was_created = 0
+                       WITH n, n._was_created AS was_created
+                       REMOVE n._was_created
+                       RETURN n.type AS existing_type, was_created,
+                              n.created_at AS created_at, n.version AS version""",
+                    id=node.id,
+                    type=node.type,
+                    attrs=json.dumps(node.attributes),
+                    conf=node.confidence,
+                    vfs=node.vfs_path,
+                    ca=_iso(node.created_at),
+                    ua=_iso(node.updated_at),
+                    v=node.version,
+                ).single()
+                if rec is None:
+                    raise RuntimeError(f"MERGE returned no row for node {node.id}")
+                if not rec["was_created"] and rec["existing_type"] != node.type:
+                    # Type collision — refuse to merge across canonical types.
+                    raise ValueError(
+                        f"node id collision across canonical types: "
+                        f"{node.id!r} exists as {rec['existing_type']!r}, "
+                        f"refusing to merge as {node.type!r}"
+                    )
+                # Reflect the post-merge state back into the in-memory node.
+                if not rec["was_created"]:
+                    node.created_at = _parse_iso(rec["created_at"]) or node.created_at
+                    node.version = rec["version"] or node.version
+        except Exception:
+            self._conn.rollback()
+            raise
+
+        try:
+            self._conn.commit()
+        except Exception:
+            # Compensate the Neo4j MERGE so the two stores don't diverge.
+            with self._session() as s:
+                s.run("MATCH (n:Entity {id: $id}) DETACH DELETE n", id=node.id)
+            raise
         return node
+
+    def add_node_provenance(
+        self,
+        node_id: str,
+        provenance: list[Provenance],
+    ) -> None:
+        """Append additional provenance traces to an existing node.
+
+        Used when re-ingesting a record under a new spec version, or when a
+        second source contributes facts to a node that already exists.
+        """
+        if not provenance:
+            return
+        with self._tx() as c:
+            for p in provenance:
+                self._insert_provenance(c, p, node_id=node_id)
 
     def get_node(self, node_id: str) -> GraphNode | None:
         with self._session() as s:
@@ -276,33 +360,99 @@ class GraphStore:
 
     # ---------- edge ops ----------
 
+    @staticmethod
+    def deterministic_edge_id(
+        source_node_id: str,
+        target_node_id: str,
+        relation_type: str,
+        valid_from: datetime | None,
+    ) -> str:
+        """sha256 of (src|rel|tgt|valid_from) — same edge ingested twice
+        produces the same id, so MERGE-on-id is safe.
+        """
+        key = "|".join([
+            source_node_id,
+            relation_type,
+            target_node_id,
+            _iso(valid_from) or "",
+        ])
+        return "edge_" + hashlib.sha256(key.encode("utf-8")).hexdigest()[:24]
+
     def add_edge(self, edge: GraphEdge) -> GraphEdge:
+        """Insert or merge an edge. Defaults the edge id to a deterministic
+        hash so repeat ingestions of the same fact don't create duplicate
+        relationships in Neo4j.
+
+        Atomicity follows the same staged pattern as add_node: SQLite
+        provenance staged first, Neo4j MERGE next, SQLite committed last;
+        Neo4j compensated on commit failure.
+        """
         rel_type = _validate_rel_type(edge.relation_type)
-        with self._session() as s:
-            res = s.run(
-                f"""MATCH (a:Entity {{id: $src}}), (b:Entity {{id: $tgt}})
-                    CREATE (a)-[r:{rel_type} {{
-                        id: $id, attributes_json: $attrs,
-                        confidence: $conf,
-                        valid_from: $vf, valid_to: $vt,
-                        version: $v
-                    }}]->(b)
-                    RETURN r""",
-                src=edge.source_node_id,
-                tgt=edge.target_node_id,
-                id=edge.id,
-                attrs=json.dumps(edge.attributes),
-                conf=edge.confidence,
-                vf=_iso(edge.valid_from),
-                vt=_iso(edge.valid_to),
-                v=edge.version,
-            ).single()
-            if res is None:
-                raise KeyError("edge endpoints must exist as nodes")
-        with self._tx() as c:
+        # Replace UUID-default ids with a deterministic id for proper MERGE
+        # behavior. Callers may still pass an explicit id (e.g. for tests).
+        if edge.id.startswith("edge_") and len(edge.id) == 5 + 12:  # default uuid hex[:12]
+            edge.id = self.deterministic_edge_id(
+                edge.source_node_id, edge.target_node_id,
+                rel_type, edge.valid_from,
+            )
+
+        try:
             for p in edge.provenance:
-                self._insert_provenance(c, p, edge_id=edge.id)
+                self._insert_provenance(self._conn, p, edge_id=edge.id)
+        except Exception:
+            self._conn.rollback()
+            raise
+
+        try:
+            with self._session() as s:
+                res = s.run(
+                    f"""MATCH (a:Entity {{id: $src}}), (b:Entity {{id: $tgt}})
+                        MERGE (a)-[r:{rel_type} {{id: $id}}]->(b)
+                        ON CREATE SET
+                            r.attributes_json = $attrs,
+                            r.confidence = $conf,
+                            r.valid_from = $vf,
+                            r.valid_to = $vt,
+                            r.version = $v
+                        ON MATCH SET
+                            r.attributes_json = $attrs,
+                            r.confidence = $conf,
+                            r.valid_to = $vt,
+                            r.version = coalesce(r.version, 0) + 1
+                        RETURN r""",
+                    src=edge.source_node_id,
+                    tgt=edge.target_node_id,
+                    id=edge.id,
+                    attrs=json.dumps(edge.attributes),
+                    conf=edge.confidence,
+                    vf=_iso(edge.valid_from),
+                    vt=_iso(edge.valid_to),
+                    v=edge.version,
+                ).single()
+                if res is None:
+                    raise KeyError("edge endpoints must exist as nodes")
+        except Exception:
+            self._conn.rollback()
+            raise
+
+        try:
+            self._conn.commit()
+        except Exception:
+            with self._session() as s:
+                s.run("MATCH ()-[r {id: $id}]-() DELETE r", id=edge.id)
+            raise
         return edge
+
+    def add_edge_provenance(
+        self,
+        edge_id: str,
+        provenance: list[Provenance],
+    ) -> None:
+        if not provenance:
+            return
+        with self._tx() as c:
+            for p in provenance:
+                self._insert_provenance(c, p, edge_id=edge_id)
 
     def get_edge(self, edge_id: str) -> GraphEdge | None:
         with self._session() as s:
@@ -412,8 +562,9 @@ class GraphStore:
         c.execute(
             """INSERT INTO provenance
                (node_id, edge_id, source_file, source_record_id, source_field,
-                extraction_method, extraction_model, extracted_at, confidence, raw_value)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                extraction_method, extraction_model, extracted_at, confidence,
+                raw_value, spec_version)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 node_id,
                 edge_id,
@@ -425,6 +576,7 @@ class GraphStore:
                 _iso(p.extracted_at),
                 p.confidence,
                 p.raw_value,
+                p.spec_version,
             ),
         )
 
@@ -503,6 +655,7 @@ class GraphStore:
 
     @staticmethod
     def _row_to_provenance(row: sqlite3.Row) -> Provenance:
+        keys = row.keys()
         return Provenance(
             source_file=row["source_file"],
             source_record_id=row["source_record_id"],
@@ -512,4 +665,5 @@ class GraphStore:
             confidence=row["confidence"],
             raw_value=row["raw_value"],
             extracted_at=_parse_iso(row["extracted_at"]),
+            spec_version=row["spec_version"] if "spec_version" in keys else None,
         )

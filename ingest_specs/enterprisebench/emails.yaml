@@ -1,0 +1,60 @@
+spec_version: 1
+tenant: enterprisebench
+source:
+  file_pattern: Enterprise_mail_system/emails.json
+  format: json
+  record_path: $[*]
+
+canonical_aliases:
+  Email: Message
+  Employee: Person
+
+nodes:
+  - name: email
+    canonical_type: Message
+    id_template: "email:{email_id}"
+    id_required_fields:
+      - $.email_id
+    fields:
+      - { attribute: email_id,    source: $.email_id }
+      - { attribute: subject,     source: $.subject }
+      - { attribute: body,        source: $.body, required: false }
+      - { attribute: sent_at,     source: $.date, transform: [parse_iso_datetime], required: false }
+      - { attribute: importance,  source: $.importance, required: false }
+      - { attribute: thread_id,   source: $.thread_id, required: false }
+      - { attribute: visibility,  source: $.category, required: false }
+
+  - name: sender
+    canonical_type: Person
+    id_template: "person:{sender_emp_id}"
+    when: { not_null: $.sender_emp_id }
+    id_required_fields:
+      - $.sender_emp_id
+    fields:
+      - { attribute: emp_id, source: $.sender_emp_id }
+      - { attribute: email,  source: $.sender_email, transform: [normalize_email], required: false }
+      - { attribute: name,   source: $.sender_name,  required: false }
+
+  - name: recipient
+    canonical_type: Person
+    id_template: "person:{recipient_emp_id}"
+    when: { not_null: $.recipient_emp_id }
+    id_required_fields:
+      - $.recipient_emp_id
+    fields:
+      - { attribute: emp_id, source: $.recipient_emp_id }
+      - { attribute: email,  source: $.recipient_email, transform: [normalize_email], required: false }
+      - { attribute: name,   source: $.recipient_name,  required: false }
+
+edges:
+  - canonical_type: SENT
+    source_node: "@sender"
+    target_node: "@email"
+    fields:
+      - { attribute: sent_at, source: $.date, transform: [parse_iso_datetime], required: false }
+
+  - canonical_type: RECEIVED
+    source_node: "@email"
+    target_node: "@recipient"
+
+llm_blocks: []
