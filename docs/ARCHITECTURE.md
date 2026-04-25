@@ -15,7 +15,9 @@
 > | Adaptive ingestion (MappingSpec / Onboarder / Ingestor) | ✅ implemented | `backend/ingest/` (this doc, see below) |
 > | Identity resolution (deterministic email match → SAME_AS) | ✅ implemented (light) | fuzzy / LLM triage stubbed |
 > | LLM-extraction blocks at ingest time | ✅ implemented | opt-in per-spec, cached |
-> | VFS materialization, REST API, MCP server, web UI, vector index, conflict detector UI | ❌ not yet | original design retained below |
+> | REST API, MCP server, web UI, conflict detector UI | ❌ not yet | original design retained below |
+> | ~~VFS materialization to disk~~ | dropped | Not needed: raw records already verbatim in `source_records`, VFS is a logical view computed from `GraphNode.vfs_path` via Cypher. No re-materialization on edit. |
+> | ~~ChromaDB / external vector index~~ | dropped | Replaced by Neo4j native vector indexes (5.13+, HNSW). Embeddings live on `:Entity` nodes; one database, no sync. |
 
 ## Executive Summary
 
@@ -58,15 +60,16 @@ The system ingests the Inazuma.co EnterpriseBench dataset (~50K records across 1
 ┌──────────▼───────────────▼───────────────▼─────────────────▼─────────────┐
 │                         KNOWLEDGE LAYER                                   │
 │                                                                           │
-│   ┌────────────────────┐  ┌──────────────────┐  ┌──────────────────────┐ │
-│   │  Knowledge Graph   │  │  Vector Index     │  │  VFS Materialized   │ │
-│   │  (Neo4j / SQLite   │  │  (ChromaDB /      │  │  Tree (JSON +       │ │
-│   │   + networkx)      │  │   FAISS)          │  │   Markdown files)   │ │
-│   └────────┬───────────┘  └────────┬──────────┘  └────────┬─────────────┘│
-│            │                       │                       │              │
-└────────────┼───────────────────────┼───────────────────────┼──────────────┘
-             │                       │                       │
-┌────────────▼───────────────────────▼───────────────────────▼──────────────┐
+│   ┌──────────────────────────────────────────────────────────────────┐  │
+│   │  Knowledge Graph + Vector Index                                   │  │
+│   │  Neo4j (entities, edges, native vector index on embeddings)       │  │
+│   │  + SQLite (provenance, raw records, ingestion control plane)      │  │
+│   │  VFS is a logical view (GraphNode.vfs_path) — no disk materialization │
+│   └────────────────────────────────┬─────────────────────────────────┘  │
+│                                    │                                     │
+└────────────────────────────────────┼─────────────────────────────────────┘
+                                     │
+┌────────────────────────────────────▼─────────────────────────────────────┐
 │                        INGESTION LAYER                                    │
 │                                                                           │
 │   ┌──────────────┐  ┌──────────────┐  ┌────────────┐  ┌───────────────┐ │
@@ -95,11 +98,10 @@ The system ingests the Inazuma.co EnterpriseBench dataset (~50K records across 1
 | Layer | Technology | Why |
 |---|---|---|
 | **Backend API** | Python 3.11 + FastAPI | Fast to build, async, great ecosystem for data/AI |
-| **Knowledge Graph** | NetworkX (in-memory) + SQLite (persistence) | Zero infrastructure, portable, sufficient for ~50K records. Neo4j optional for production |
-| **Vector Search** | ChromaDB (embedded) | Zero-config, persistent, runs in-process |
+| **Knowledge Graph + Vector Search** | Neo4j 5.13+ (graph + native HNSW vector index) + SQLite (provenance, raw records, ingestion control plane) | One database for graph and embeddings — no separate vector store to sync. ChromaDB removed. |
 | **LLM** | Claude API (claude-sonnet-4-6) | Entity extraction, conflict resolution, summarization |
 | **Frontend** | Next.js 14 + React + Tailwind + shadcn/ui | Fast to prototype, good file-tree components |
-| **VFS Materialization** | JSON + Markdown files on disk | Inspectable, git-friendly, tool-friendly |
+| **VFS** | Logical view via `GraphNode.vfs_path` + Cypher queries | Raw records already verbatim in `source_records`; no need to write a parallel tree of markdown files to disk. |
 | **PDF Parsing** | PyMuPDF (fitz) | Fast, reliable PDF text extraction |
 | **Data Parsing** | pandas + orjson | High-performance JSON/CSV handling |
 
@@ -847,7 +849,7 @@ POST /api/search
 }
 ```
 
-Uses ChromaDB vector index over VFS file contents. Returns ranked results with source paths.
+Uses Neo4j's native vector index over `:Entity` node embeddings (`db.index.vector.queryNodes`). Returns ranked nodes with their `vfs_path` and provenance.
 
 **Mode 3: Graph traversal (for multi-hop questions)**
 
@@ -909,19 +911,18 @@ Step 5: BUILD GRAPH
     → Compute confidence scores
     → Build temporal validity windows
 
-Step 6: MATERIALIZE VFS
+Step 6: ASSIGN VFS PATHS
   Walk the knowledge graph:
-    → Create directory structure
-    → Generate markdown files with frontmatter
-    → Build _index.md summaries at each level
-    → Generate cross-reference links
+    → Set `GraphNode.vfs_path` (e.g. /company/people/<dept>/<emp_id>-<slug>)
+    → No file writes — VFS is a logical view computed from this string + Cypher
+    → `_index` summaries are derived on demand from queries
 
 Step 7: INDEX FOR SEARCH
-  For each VFS file:
-    → Chunk content
-    → Generate embeddings (sentence-transformers or OpenAI)
-    → Insert into ChromaDB
-    → Build BM25 index for keyword search
+  For each :Entity node worth indexing:
+    → Generate embedding from `attributes` + linked `source_records.raw_record`
+    → Write to a `vector` property on the node
+    → Neo4j's native HNSW vector index makes it queryable via
+      db.index.vector.queryNodes(); no external store, no sync
 ```
 
 ### Incremental Update Flow (when source data changes)
@@ -1254,8 +1255,8 @@ def search(query: str, scope: str, top_k: int) -> list[dict]: ...
 
 ### Phase 2: Core (Hours 4–10)
 
-- [ ] VFS materialization engine (graph → markdown files with frontmatter)
-- [ ] VFS API endpoints (ls, cat, grep, find, stat, tree)
+- [ ] VFS path assignment pass (set `GraphNode.vfs_path` per type) — no disk writes
+- [ ] VFS API endpoints (ls, cat, grep, find, stat, tree) — Cypher-backed
 - [ ] Provenance tracking through the full pipeline
 - [ ] Conflict detection engine (rule-based)
 - [ ] Auto-resolution for known conflict types (signature mismatch, date ordering, etc.)
@@ -1263,7 +1264,7 @@ def search(query: str, scope: str, top_k: int) -> list[dict]: ...
 ### Phase 3: Intelligence (Hours 10–16)
 
 - [ ] PDF parsing for policy documents (PyMuPDF + LLM extraction)
-- [ ] ChromaDB vector index over VFS files
+- [ ] Embed `:Entity` nodes + create Neo4j native vector index
 - [ ] Hybrid search API (semantic + keyword + graph)
 - [ ] Graph query API (node lookup, traversal, path finding)
 - [ ] LLM-based conflict triage for medium-confidence conflicts
@@ -1317,13 +1318,11 @@ better-context/
 │   │   ├── store.py               # NetworkX + SQLite persistence
 │   │   └── query.py               # Graph query engine
 │   ├── vfs/
-│   │   ├── materializer.py        # Graph → markdown files
-│   │   ├── renderer.py            # Entity → markdown template
-│   │   └── operations.py          # ls, cat, grep, find, stat
+│   │   ├── paths.py               # Assign GraphNode.vfs_path per type (no disk)
+│   │   └── operations.py          # ls, cat, grep, find, stat — Cypher-backed
 │   ├── search/
-│   │   ├── vector.py              # ChromaDB indexing + querying
-│   │   ├── keyword.py             # BM25 index
-│   │   └── hybrid.py              # Combined search
+│   │   ├── embed.py               # Embed nodes, write to :Entity.vector
+│   │   └── hybrid.py              # Neo4j native vector index + keyword
 │   ├── conflicts/
 │   │   ├── detector.py            # Rule-based conflict detection
 │   │   ├── resolver.py            # Auto + LLM resolution
