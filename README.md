@@ -8,7 +8,7 @@ a knowledge graph with **fact-level provenance**. See
 ## Layout
 
 ```
-backend/        Python: knowledge graph store + adaptive ingestion + LLM client
+backend/        Python: knowledge graph store + adaptive ingestion + REST API + LLM client
 frontend/       Next.js + React UI (not yet scaffolded)
 dataset/        EnterpriseBench source data (sample tenant)
 ingest_specs/   per-tenant per-source MappingSpec YAMLs
@@ -23,10 +23,13 @@ data/           runtime SQLite db (gitignored)
 - **Adaptive ingestion** — `MappingSpec` per (tenant, source-file) drives a
   deterministic ingester. LLM (Gemini Flash 2.5) only at onboarding +
   opt-in unstructured extraction. Drift detection aborts on schema change.
+- **REST API** — FastAPI serving graph data with full provenance. Joins
+  Neo4j (graph + content) with SQLite (traces + raw records) into unified
+  JSON responses. Pydantic v2 models generate the OpenAPI spec.
 - **Identity resolution (light)** — deterministic email-match → `SAME_AS`
   edges. Fuzzy + LLM triage stubbed for later.
 
-What's **not** built yet: virtual file system, REST API, MCP server, web UI,
+What's **not** built yet: virtual file system, MCP server, web UI,
 vector index, conflict-resolution UI. See the implementation-status table in
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
@@ -91,7 +94,55 @@ Start Neo4j:
 
 ```bash
 docker run -d -p 7687:7687 -p 7474:7474 \
-  -e NEO4J_AUTH=neo4j/neo4j neo4j:5
+  -e NEO4J_AUTH=neo4j/better_context neo4j:5
+```
+
+## REST API
+
+Start the API server:
+
+```bash
+uv run uvicorn backend.api.app:app --reload --port 8000
+```
+
+Interactive docs at http://localhost:8000/docs (Swagger UI).
+
+### Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/graph/stats` | Node/edge counts, types, provenance/raw counts |
+| `GET /api/graph/node/{id}` | Node + attributes + full provenance chain |
+| `GET /api/graph/node/{id}/neighbors?relation_type=SENT&depth=1` | Traverse the graph |
+| `GET /api/graph/nodes?type=Person&limit=50&offset=0` | List nodes by type (paginated) |
+| `GET /api/graph/edge/{id}` | Edge + provenance |
+| `GET /api/graph/path?from={id}&to={id}&max_hops=6` | Shortest path between nodes |
+| `GET /api/source/{source_file}/{record_id}` | Original raw JSON record (layer 4) |
+
+### Provenance trace (how to map graph data back to source files)
+
+Every node/edge response includes a `provenance[]` array. Each entry contains:
+
+- `source_file` -- which file the fact was ingested from (e.g. `Enterprise_mail_system/emails.json`)
+- `source_record_id` -- which record within that file
+- `source_field` -- which JSONPath field (e.g. `$.sender_email`)
+- `extraction_method` -- `direct_mapping` | `llm_extraction` | `rule_based` | `human`
+- `confidence` -- 0.0 to 1.0
+- `raw_value` -- the original value before transformation
+
+To get the full original record, call `GET /api/source/{source_file}/{source_record_id}`.
+
+### Example: trace a person back to source
+
+```bash
+# 1. Get person node (from Neo4j + SQLite provenance)
+curl http://localhost:8000/api/graph/node/person:emp_1002
+
+# 2. Get emails this person sent (from Neo4j)
+curl "http://localhost:8000/api/graph/node/person:emp_1002/neighbors?relation_type=SENT&depth=1"
+
+# 3. Get the raw source record (from SQLite layer 4)
+curl "http://localhost:8000/api/source/Enterprise_mail_system/emails.json/email:095a317c-8bd5-43d8-8796-490882a0f1bf"
 ```
 
 ## Adaptive ingestion — company-data agnostic
@@ -262,6 +313,9 @@ backend/
 ├── graph/
 │   ├── schema.sql      raw + provenance + ingestion-control-plane tables
 │   └── store.py        GraphStore (Neo4j + SQLite, MERGE-based)
+├── api/
+│   ├── models.py       Pydantic v2 response models (OpenAPI source of truth)
+│   └── app.py          FastAPI app: graph + source-record endpoints
 └── ingest/
     ├── canonical.yaml  canonical type registry (data, not code)
     ├── spec.py         pydantic MappingSpec + canonical-registry loader

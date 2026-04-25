@@ -1069,7 +1069,35 @@ If source data later changes emp_0431's skills → conflict detected:
 
 ## API Design
 
-### VFS API (file-system operations for agents)
+### Graph API (structured queries) -- IMPLEMENTED
+
+**Implementation:** `backend/api/app.py` (FastAPI + Pydantic v2 response models)
+**Response models:** `backend/api/models.py`
+**Run:** `uv run uvicorn backend.api.app:app --reload --port 8000`
+**Docs:** http://localhost:8000/docs (Swagger UI) | http://localhost:8000/openapi.json
+
+Every response joins Neo4j (graph + content) with SQLite (provenance + raw data).
+Node and edge responses include the full provenance chain: which source file, which
+field, which extraction method, what confidence, and the original raw value.
+
+```
+GET  /api/graph/node/{id}                                  # Node + attributes + provenance
+GET  /api/graph/node/{id}/neighbors?relation_type=X&depth=N  # Traverse graph
+GET  /api/graph/nodes?type=Person&limit=50&offset=0        # List nodes by type (paginated)
+GET  /api/graph/edge/{id}                                  # Edge + provenance
+GET  /api/graph/path?from={id}&to={id}&max_hops=6          # Shortest path
+GET  /api/graph/stats                                      # Graph-level metrics
+GET  /api/source/{source_file}/{record_id}                 # Raw source record (layer 4)
+```
+
+**Provenance trace flow** (how the UI maps graph data back to source files):
+
+1. `GET /api/graph/node/person:emp_1002` returns the Person with provenance[]
+2. Each provenance entry contains `source_file` and `source_record_id`
+3. `GET /api/source/{source_file}/{source_record_id}` returns the original raw JSON record
+4. The UI can show: fact -> extraction method -> source file -> original value
+
+### VFS API (file-system operations for agents) -- NOT YET IMPLEMENTED
 
 ```
 GET  /api/vfs/ls?path=/company/people/          # List directory
@@ -1080,17 +1108,7 @@ GET  /api/vfs/stat?path=/company/people/eng/...   # File metadata (provenance, v
 GET  /api/vfs/tree?path=/company/&depth=2         # Directory tree
 ```
 
-### Graph API (structured queries)
-
-```
-GET  /api/graph/node/:id                         # Get node with provenance
-GET  /api/graph/node/:id/neighbors?type=REPORTS_TO&depth=2  # Traverse
-POST /api/graph/query                            # Pattern matching query
-GET  /api/graph/path?from=:id&to=:id&max_hops=4 # Shortest path
-GET  /api/graph/stats                            # Graph-level metrics
-```
-
-### Search API (hybrid retrieval)
+### Search API (hybrid retrieval) -- NOT YET IMPLEMENTED
 
 ```
 POST /api/search                                 # Semantic + keyword search
@@ -1100,7 +1118,7 @@ POST /api/search/graph                           # Graph-enhanced search
   { "query": "...", "start_entity": "emp_0431", "hops": 2 }
 ```
 
-### Edit API (human-in-the-loop)
+### Edit API (human-in-the-loop) -- NOT YET IMPLEMENTED
 
 ```
 PUT  /api/vfs/edit                               # Edit a VFS file
@@ -1111,7 +1129,7 @@ POST /api/conflicts/:id/resolve                  # Resolve a conflict
   { "resolution": "keep_a" | "keep_b" | "merge", "rationale": "..." }
 ```
 
-### MCP Server (for Claude / AI agents)
+### MCP Server (for Claude / AI agents) -- NOT YET IMPLEMENTED
 
 ```python
 # Model Context Protocol server exposing VFS as tools
