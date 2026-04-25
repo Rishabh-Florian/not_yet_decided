@@ -18,20 +18,32 @@ data/           runtime SQLite db (gitignored)
 
 ## What's built
 
-- **Knowledge graph store** — Neo4j (graph + content) + SQLite (traces + raw
+- **Knowledge graph store** -- Neo4j (graph + content) + SQLite (traces + raw
   records). `MERGE`-on-id dedup, deterministic edge ids, atomic-tx pattern.
-- **Adaptive ingestion** — `MappingSpec` per (tenant, source-file) drives a
+- **Adaptive ingestion** -- `MappingSpec` per (tenant, source-file) drives a
   deterministic ingester. LLM (Gemini Flash 2.5) only at onboarding +
   opt-in unstructured extraction. Drift detection aborts on schema change.
-- **REST API** — FastAPI serving graph data with full provenance. Joins
+- **REST API** -- FastAPI serving graph data with full provenance. Joins
   Neo4j (graph + content) with SQLite (traces + raw records) into unified
   JSON responses. Pydantic v2 models generate the OpenAPI spec.
-- **Identity resolution (light)** — deterministic email-match → `SAME_AS`
+  - **Graph read endpoints** (7 GET) -- node, edge, neighbors, path, stats, nodes-by-type, source record
+  - **Pattern query** (`POST /api/graph/query`) -- typed DSL `(Person)-[SENT]->(Message)` returns paginated triples with provenance
+  - **Edit API** (`PUT /api/graph/node/{id}`) -- human-in-the-loop corrections with per-attribute provenance tracking
+- **Identity resolution (light)** -- deterministic email-match -> `SAME_AS`
   edges. Fuzzy + LLM triage stubbed for later.
+- **30 passing tests** -- 6 vendor-agnosticism tests + 24 pattern-query/edit tests (parser, integration, endpoint)
 
-What's **not** built yet: virtual file system, MCP server, web UI,
-vector index, conflict-resolution UI. See the implementation-status table in
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+## What's not built yet
+
+| Feature | Why it matters | Effort estimate |
+|---------|---------------|-----------------|
+| VFS API (`ls`, `cat`, `grep`, `find`, `stat`, `tree`) | Lets AI agents browse the knowledge graph as a file system | Medium -- Cypher queries over `vfs_path`, no disk writes |
+| Search API (semantic + hybrid) | Natural language queries over the graph | Medium -- Neo4j native HNSW vector index, embedding generation |
+| Conflict resolution engine + UI | Auto-resolve known conflict types, queue ambiguous ones for humans | Large -- rule engine + LLM triage + resolution API + UI |
+| MCP server | Claude-native tool interface over the API | Small -- thin wrappers around existing endpoints |
+| Web UI (React + Next.js) | Human browse, search, edit, resolve conflicts | Large -- VFS tree, content viewer, graph viz, conflict queue |
+
+See the full flow-by-flow status in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Knowledge graph
 
@@ -117,6 +129,8 @@ Interactive docs at http://localhost:8000/docs (Swagger UI).
 | `GET /api/graph/nodes?type=Person&limit=50&offset=0` | List nodes by type (paginated) |
 | `GET /api/graph/edge/{id}` | Edge + provenance |
 | `GET /api/graph/path?from={id}&to={id}&max_hops=6` | Shortest path between nodes |
+| `POST /api/graph/query` | Pattern query: `{"pattern": "(Person)-[SENT]->(Message)"}` |
+| `PUT /api/graph/node/{id}` | Edit node: `{"attributes": {...}, "editor": "name"}` |
 | `GET /api/source/{source_file}/{record_id}` | Original raw JSON record (layer 4) |
 
 ### Provenance trace (how to map graph data back to source files)
@@ -143,6 +157,39 @@ curl "http://localhost:8000/api/graph/node/person:emp_1002/neighbors?relation_ty
 
 # 3. Get the raw source record (from SQLite layer 4)
 curl "http://localhost:8000/api/source/Enterprise_mail_system/emails.json/email:095a317c-8bd5-43d8-8796-490882a0f1bf"
+```
+
+### Example: pattern query (Flow 2)
+
+```bash
+# Find all Person->SENT->Message triples (paginated)
+curl -X POST http://localhost:8000/api/graph/query \
+  -H 'Content-Type: application/json' \
+  -d '{"pattern": "(Person)-[SENT]->(Message)", "limit": 5}'
+
+# Response: { "pattern": "...", "matches": [{source, edge, target}, ...], "total": 11928 }
+
+# Other patterns:
+# (Person)-[REPORTS_TO]->(Person)     -- reporting chains
+# (Organization)-[OWNS]->(Asset)     -- org assets
+# (Person)-[AUTHORED]->(Document)    -- authorship
+```
+
+Supported node types: Person, Organization, Document, Message, Event, Asset, Topic.
+Supported relation types: MEMBER_OF, REPORTS_TO, WORKS_ON, OWNS, AUTHORED, SENT,
+RECEIVED, MENTIONS, PART_OF, PURCHASED, ASSIGNED_TO, TAGGED, RELATED_TO, SAME_AS.
+
+### Example: edit a node (Flow 5)
+
+```bash
+# Add a skill to a person (with human provenance tracking)
+curl -X PUT http://localhost:8000/api/graph/node/person:emp_1002 \
+  -H 'Content-Type: application/json' \
+  -d '{"attributes": {"skills": "Python, ML, Kubernetes"}, "editor": "florian@company.com"}'
+
+# Response includes the updated node with new human provenance:
+# provenance[]: { extraction_method: "human", extraction_model: "human:florian@company.com",
+#                 confidence: 1.0, source_file: "human_edits", ... }
 ```
 
 ## Adaptive ingestion — company-data agnostic
@@ -315,7 +362,9 @@ backend/
 │   └── store.py        GraphStore (Neo4j + SQLite, MERGE-based)
 ├── api/
 │   ├── models.py       Pydantic v2 response models (OpenAPI source of truth)
-│   └── app.py          FastAPI app: graph + source-record endpoints
+│   └── app.py          FastAPI app: graph + pattern query + edit + source-record endpoints
+├── test_ingest_agnostic.py  cross-vendor agnosticism proof (4 shapes, 1 Ingestor)
+├── test_graph_query_edit.py pattern query DSL + edit API tests (24 tests)
 └── ingest/
     ├── canonical.yaml  canonical type registry (data, not code)
     ├── spec.py         pydantic MappingSpec + canonical-registry loader

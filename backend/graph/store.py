@@ -24,7 +24,7 @@ import os
 import re
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Iterator, LiteralString, cast
 
@@ -62,6 +62,42 @@ def _validate_rel_type(rel: str) -> str:
             f"invalid relation_type {rel!r}: must match [A-Za-z_][A-Za-z0-9_]*"
         )
     return rel
+
+
+_PATTERN_RE = re.compile(r"^\((\w+)\)-\[(\w+)\]->\((\w+)\)$")
+
+
+def parse_pattern(pattern: str) -> tuple[str, str, str]:
+    """Parse '(Type)-[REL]->(Type)' into (source_type, rel_type, target_type).
+
+    Validates node types against the canonical registry and relation types
+    against both the Cypher-safe regex and the canonical registry.
+    """
+    from backend.ingest.spec import CANONICAL_NODE_TYPES, CANONICAL_RELATION_TYPES
+
+    m = _PATTERN_RE.match(pattern.strip())
+    if m is None:
+        raise ValueError(
+            f"invalid pattern {pattern!r}: expected (NodeType)-[REL_TYPE]->(NodeType)"
+        )
+    src_type, rel_type, tgt_type = m.group(1), m.group(2), m.group(3)
+    if src_type not in CANONICAL_NODE_TYPES:
+        raise ValueError(
+            f"unknown source node type {src_type!r}; "
+            f"valid: {sorted(CANONICAL_NODE_TYPES)}"
+        )
+    if tgt_type not in CANONICAL_NODE_TYPES:
+        raise ValueError(
+            f"unknown target node type {tgt_type!r}; "
+            f"valid: {sorted(CANONICAL_NODE_TYPES)}"
+        )
+    _validate_rel_type(rel_type)
+    if rel_type not in CANONICAL_RELATION_TYPES:
+        raise ValueError(
+            f"unknown relation type {rel_type!r}; "
+            f"valid: {sorted(CANONICAL_RELATION_TYPES)}"
+        )
+    return src_type, rel_type, tgt_type
 
 
 class GraphStore:
@@ -334,6 +370,105 @@ class GraphStore:
                 raise KeyError(node_id)
         return node
 
+    def edit_node(
+        self,
+        node_id: str,
+        attributes: dict[str, Any],
+        editor: str,
+    ) -> GraphNode:
+        """Apply a human edit: update attributes with full provenance tracking.
+
+        Creates a synthetic source_record (satisfying the FK constraint), one
+        Provenance row per changed attribute, then updates the node in Neo4j.
+        Follows the same staged atomicity as add_node: SQLite first, Neo4j
+        next, SQLite commit last, Neo4j compensated on failure.
+        """
+        node = self.get_node(node_id)
+        if node is None:
+            raise KeyError(node_id)
+
+        now = datetime.now(timezone.utc)
+        iso_now = now.isoformat()
+        source_record_id = f"edit:{node_id}:{iso_now}"
+
+        self.add_source_record(
+            source_file="human_edits",
+            source_record_id=source_record_id,
+            raw_record={
+                "node_id": node_id,
+                "editor": editor,
+                "changes": attributes,
+                "edited_at": iso_now,
+            },
+        )
+
+        provenance = [
+            Provenance(
+                source_file="human_edits",
+                source_record_id=source_record_id,
+                source_field=attr_key,
+                extraction_method="human",
+                extraction_model=f"human:{editor}",
+                confidence=1.0,
+                raw_value=str(value),
+                extracted_at=now,
+                spec_version=None,
+            )
+            for attr_key, value in attributes.items()
+        ]
+
+        try:
+            for p in provenance:
+                self._insert_provenance(self._conn, p, node_id=node_id)
+        except Exception:
+            self._conn.rollback()
+            raise
+
+        old_attrs = json.dumps(node.attributes)
+        old_ua = _iso(node.updated_at)
+        old_version = node.version
+
+        node.attributes.update(attributes)
+        node.touch()
+
+        try:
+            with self._session() as s:
+                res = s.run(
+                    """MATCH (n:Entity {id: $id})
+                       SET n.attributes_json = $attrs,
+                           n.updated_at = $ua,
+                           n.version = $v
+                       RETURN n""",
+                    id=node_id,
+                    attrs=json.dumps(node.attributes),
+                    ua=_iso(node.updated_at),
+                    v=node.version,
+                ).single()
+                if res is None:
+                    raise KeyError(node_id)
+        except Exception:
+            self._conn.rollback()
+            raise
+
+        try:
+            self._conn.commit()
+        except Exception:
+            with self._session() as s:
+                s.run(
+                    """MATCH (n:Entity {id: $id})
+                       SET n.attributes_json = $attrs,
+                           n.updated_at = $ua,
+                           n.version = $v""",
+                    id=node_id,
+                    attrs=old_attrs,
+                    ua=old_ua,
+                    v=old_version,
+                )
+            raise
+
+        node.provenance = self._provenance_for_node(node_id)
+        return node
+
     def delete_node(self, node_id: str) -> None:
         # Cascade by hand: provenance lives in SQLite and references this node
         # plus any incident edges; we collect those edge ids before DETACH DELETE
@@ -523,6 +658,59 @@ class GraphStore:
         for r in records:
             n = r["n"]
             yield self._neo_node_to_node(n, prov_map.get(n["id"], []))
+
+    def pattern_query(
+        self,
+        source_type: str,
+        relation_type: str,
+        target_type: str,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[list[tuple[GraphNode, GraphEdge, GraphNode]], int]:
+        """Execute a typed pattern query: (SourceType)-[REL]->(TargetType).
+
+        Returns (matches, total_count) where each match is a
+        (source_node, edge, target_node) triple with provenance loaded.
+        """
+        rel = _validate_rel_type(relation_type)
+        count_cypher = cast(LiteralString,
+            f"MATCH (a:Entity {{type: $src}})-[r:{rel}]->(b:Entity {{type: $tgt}}) "
+            f"RETURN count(*) AS c"
+        )
+        match_cypher = cast(LiteralString,
+            f"MATCH (a:Entity {{type: $src}})-[r:{rel}]->(b:Entity {{type: $tgt}}) "
+            f"RETURN a, b, r, r.id AS eid, type(r) AS rt "
+            f"SKIP {int(offset)} LIMIT {int(limit)}"
+        )
+        with self._session() as s:
+            count_rec = s.run(count_cypher, src=source_type, tgt=target_type).single()
+            total = count_rec["c"] if count_rec else 0
+            records = list(s.run(match_cypher, src=source_type, tgt=target_type))
+
+        all_node_ids: list[str] = []
+        edge_ids: list[str] = []
+        for r in records:
+            all_node_ids.append(r["a"]["id"])
+            all_node_ids.append(r["b"]["id"])
+            if r["eid"]:
+                edge_ids.append(r["eid"])
+
+        prov_map = self._provenance_map_for_nodes(list(set(all_node_ids)))
+
+        results: list[tuple[GraphNode, GraphEdge, GraphNode]] = []
+        for r in records:
+            a_id = r["a"]["id"]
+            b_id = r["b"]["id"]
+            eid = r["eid"] or ""
+            src_node = self._neo_node_to_node(r["a"], prov_map.get(a_id, []))
+            tgt_node = self._neo_node_to_node(r["b"], prov_map.get(b_id, []))
+            edge = self._neo_rel_to_edge(
+                eid, a_id, b_id, r["rt"], r["r"],
+                self._provenance_for_edge(eid) if eid else [],
+            )
+            results.append((src_node, edge, tgt_node))
+
+        return results, total
 
     def stats(self) -> dict[str, Any]:
         with self._session() as s:

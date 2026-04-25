@@ -1,6 +1,6 @@
 # Better Context Track — System Architecture & Design
 
-> **Implementation Status (2026-04-25).** This document is the original
+> **Implementation Status (2026-04-26).** This document is the original
 > aspirational design. The actual implementation has diverged in one
 > important way: instead of per-source hardcoded parsers + per-source LLM
 > extractors (the original Components 1 + 2), Better Context uses an
@@ -10,14 +10,31 @@
 >
 > | Subsystem | Status | Notes |
 > |---|---|---|
-> | Knowledge graph store (Neo4j + SQLite hybrid) | ✅ implemented | `backend/graph/` |
-> | Fact-level provenance + raw record store | ✅ implemented | `source_records`, `provenance` |
-> | Adaptive ingestion (MappingSpec / Onboarder / Ingestor) | ✅ implemented | `backend/ingest/` (this doc, see below) |
-> | Identity resolution (deterministic email match → SAME_AS) | ✅ implemented (light) | fuzzy / LLM triage stubbed |
-> | LLM-extraction blocks at ingest time | ✅ implemented | opt-in per-spec, cached |
-> | REST API, MCP server, web UI, conflict detector UI | ❌ not yet | original design retained below |
+> | Knowledge graph store (Neo4j + SQLite hybrid) | **done** | `backend/graph/store.py` |
+> | Fact-level provenance + raw record store | **done** | `source_records`, `provenance` tables |
+> | Adaptive ingestion (MappingSpec / Onboarder / Ingestor) | **done** | `backend/ingest/` |
+> | Identity resolution (deterministic email match -> SAME_AS) | **done** (light) | fuzzy / LLM triage stubbed |
+> | LLM-extraction blocks at ingest time | **done** | opt-in per-spec, cached |
+> | REST API — Graph read endpoints | **done** | `backend/api/app.py` — 7 GET endpoints |
+> | REST API — Graph pattern query | **done** | `POST /api/graph/query` — typed pattern DSL |
+> | REST API — Edit API (human-in-the-loop) | **done** | `PUT /api/graph/node/{id}` — provenance-tracked edits |
+> | VFS API (ls, cat, grep, find, stat, tree) | not yet | VFS is a logical view (no disk materialization) — endpoints not built |
+> | Search API (semantic + hybrid, Neo4j HNSW) | not yet | Vector index architecture designed, endpoints not built |
+> | Conflict resolution engine + UI | not yet | Rule-based + LLM triage designed, not implemented |
+> | MCP server (for Claude / AI agents) | not yet | MCP tool wrappers over existing API |
+> | Web UI (React + Next.js) | not yet | No frontend code |
 > | ~~VFS materialization to disk~~ | dropped | Not needed: raw records already verbatim in `source_records`, VFS is a logical view computed from `GraphNode.vfs_path` via Cypher. No re-materialization on edit. |
 > | ~~ChromaDB / external vector index~~ | dropped | Replaced by Neo4j native vector indexes (5.13+, HNSW). Embeddings live on `:Entity` nodes; one database, no sync. |
+>
+> ### User Flow Status
+>
+> | Flow | Description | Status | What's working | What's missing |
+> |------|-------------|--------|----------------|----------------|
+> | **Flow 1** | AI Agent Retrieves Context (VFS browse) | not yet | — | VFS API endpoints (`ls`, `cat`, `grep`, `find`) |
+> | **Flow 2** | AI Agent Answers Complex Question (pattern query) | **partial** | `POST /api/graph/query` returns typed pattern matches with provenance | VFS `cat` for enriching results with full entity files |
+> | **Flow 3** | Human Browses Company Memory (web UI) | not yet | — | Frontend (React + Next.js), graph visualization |
+> | **Flow 4** | Human Resolves Conflict (conflict queue) | not yet | — | Conflict detection engine, resolution API, queue UI |
+> | **Flow 5** | Human Edits Company Memory (edit + provenance) | **done** | `PUT /api/graph/node/{id}` with synthetic source records, per-attribute human provenance, version bumps | — |
 
 ## Executive Summary
 
@@ -321,6 +338,7 @@ backend/
     identity.py              IdentityResolver (deterministic email match)
     __main__.py              CLI: dryrun / run / onboard / promote / resolve-identity
   test_ingest_agnostic.py    cross-vendor agnosticism proof (4 shapes, 1 Ingestor)
+  test_graph_query_edit.py   pattern query DSL + edit API tests (24 tests: parser, integration, endpoint)
 ingest_specs/
   enterprisebench/
     emails.yaml              hand-written reference spec
@@ -1088,7 +1106,22 @@ GET  /api/graph/edge/{id}                                  # Edge + provenance
 GET  /api/graph/path?from={id}&to={id}&max_hops=6          # Shortest path
 GET  /api/graph/stats                                      # Graph-level metrics
 GET  /api/source/{source_file}/{record_id}                 # Raw source record (layer 4)
+POST /api/graph/query                                      # Pattern query (typed DSL)
+PUT  /api/graph/node/{id}                                  # Edit node (human-in-the-loop)
 ```
+
+**Pattern query** (`POST /api/graph/query`): accepts a typed DSL pattern like
+`(Person)-[SENT]->(Message)`. Node and relation types are validated against the
+canonical registry. Returns paginated triples (source_node, edge, target_node)
+with full provenance. Relation types are Cypher-safe (regex-validated, inlined
+via `cast(LiteralString, ...)`); node types are passed as parameters.
+
+**Edit API** (`PUT /api/graph/node/{id}`): human-in-the-loop corrections.
+Updates node attributes and creates per-attribute provenance traces with
+`extraction_method="human"`, `confidence=1.0`, `extraction_model="human:{editor}"`.
+Satisfies the `source_records` FK constraint by inserting a synthetic source record.
+Follows the same staged atomicity as `add_node`: SQLite first, Neo4j next, SQLite
+commit last, Neo4j compensated on failure.
 
 **Provenance trace flow** (how the UI maps graph data back to source files):
 
@@ -1118,16 +1151,27 @@ POST /api/search/graph                           # Graph-enhanced search
   { "query": "...", "start_entity": "emp_0431", "hops": 2 }
 ```
 
-### Edit API (human-in-the-loop) -- NOT YET IMPLEMENTED
+### Edit API (human-in-the-loop) -- IMPLEMENTED
+
+**Implementation:** `PUT /api/graph/node/{id}` in `backend/api/app.py`,
+backed by `GraphStore.edit_node()` in `backend/graph/store.py`.
 
 ```
-PUT  /api/vfs/edit                               # Edit a VFS file
-  { "path": "/company/people/...", "field": "skills", "new_value": "..." }
-
-GET  /api/conflicts                              # List pending conflicts
-POST /api/conflicts/:id/resolve                  # Resolve a conflict
-  { "resolution": "keep_a" | "keep_b" | "merge", "rationale": "..." }
+PUT  /api/graph/node/{id}                                  # Edit node attributes
+  { "attributes": {"skills": "Python, ML, Kubernetes"}, "editor": "user@company.com" }
 ```
+
+The edit flow matches the design in Flow 5:
+1. User submits changed attributes + editor identity
+2. System creates a synthetic `source_record` (satisfies FK constraint)
+3. One `Provenance` row per changed attribute: `extraction_method="human"`,
+   `confidence=1.0`, `extraction_model="human:{editor}"`, `spec_version=None`
+4. Node attributes updated in Neo4j, version bumped
+5. Atomic: SQLite staged first, Neo4j next, SQLite committed last
+
+**Not yet implemented from the original spec:**
+- `PUT /api/vfs/edit` (VFS-path-based edit) -- requires VFS API
+- `GET /api/conflicts` + `POST /api/conflicts/:id/resolve` -- requires conflict detection engine
 
 ### MCP Server (for Claude / AI agents) -- NOT YET IMPLEMENTED
 

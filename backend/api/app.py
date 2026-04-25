@@ -17,15 +17,19 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 import backend.config as cfg
-from backend.graph.store import GraphStore
+from backend.graph.store import GraphStore, parse_pattern
 from backend.models.graph import GraphEdge, GraphNode, Provenance
 
 from .models import (
     EdgeResponse,
+    EditNodeRequest,
     NeighborsResponse,
     NodeListResponse,
     NodeResponse,
     PathResponse,
+    PatternMatch,
+    PatternQueryRequest,
+    PatternQueryResponse,
     ProvenanceResponse,
     SourceRecordResponse,
     StatsResponse,
@@ -178,6 +182,50 @@ async def graph_stats(
     store: GraphStore = Depends(get_store),
 ) -> StatsResponse:
     return StatsResponse(**store.stats())
+
+
+# ---------- Pattern Query API ----------
+
+
+@app.post("/api/graph/query", response_model=PatternQueryResponse)
+async def pattern_query(
+    body: PatternQueryRequest,
+    store: GraphStore = Depends(get_store),
+) -> PatternQueryResponse:
+    try:
+        src_type, rel_type, tgt_type = parse_pattern(body.pattern)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    matches, total = store.pattern_query(
+        src_type, rel_type, tgt_type,
+        limit=body.limit, offset=body.offset,
+    )
+    return PatternQueryResponse(
+        pattern=body.pattern,
+        matches=[
+            PatternMatch(source=_node(s), edge=_edge(e), target=_node(t))
+            for s, e, t in matches
+        ],
+        total=total,
+    )
+
+
+# ---------- Edit API ----------
+
+
+@app.put("/api/graph/node/{node_id}", response_model=NodeResponse)
+async def edit_node(
+    node_id: str,
+    body: EditNodeRequest,
+    store: GraphStore = Depends(get_store),
+) -> NodeResponse:
+    if not body.attributes:
+        raise HTTPException(400, "attributes must not be empty")
+    try:
+        node = store.edit_node(node_id, body.attributes, body.editor)
+    except KeyError:
+        raise HTTPException(404, f"node {node_id!r} not found") from None
+    return _node(node)
 
 
 # ---------- Source record API ----------

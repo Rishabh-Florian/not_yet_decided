@@ -71,3 +71,26 @@ class StatsResponse(BaseModel):
     graph: dict[str, Any]
     traces: dict[str, Any]
     raw: dict[str, Any]
+
+
+class PatternQueryRequest(BaseModel):
+    pattern: str
+    limit: int = 50
+    offset: int = 0
+
+
+class PatternMatch(BaseModel):
+    source: NodeResponse
+    edge: EdgeResponse
+    target: NodeResponse
+
+
+class PatternQueryResponse(BaseModel):
+    pattern: str
+    matches: list[PatternMatch]
+    total: int
+
+
+class EditNodeRequest(BaseModel):
+    attributes: dict[str, Any]
+    editor: str
