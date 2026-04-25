@@ -30,7 +30,7 @@ from .spec import EdgeRule, FieldMap, LLMExtraction, MappingSpec, NodeRule
 from .store import IngestStore
 
 
-log = logging.getLogger("qontext.ingest")
+log = logging.getLogger("better_context.ingest")
 
 
 class RecordError(Exception):

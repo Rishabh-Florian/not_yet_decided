@@ -1,4 +1,4 @@
-# Qontext (workspace: `not_yet_decided`)
+# Better Context (workspace: `not_yet_decided`)
 
 Turns fragmented enterprise data (email, CRM, HR, IT tickets, chat, code,
 policies) into a structured, inspectable, editable company memory backed by
@@ -214,7 +214,7 @@ from backend.ingest.spec import MappingSpec
 
 spec = MappingSpec.from_yaml(open("ingest_specs/enterprisebench/emails.yaml").read())
 
-with GraphStore("data/qontext.sqlite") as store:
+with GraphStore("data/better_context.sqlite") as store:
     ingest_store = IngestStore(store._conn)
     ing = Ingestor(store, ingest_store)
     report = ing.run(spec, "dataset/EnterpriseBench/Enterprise_mail_system/emails.json",

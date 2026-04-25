@@ -1,6 +1,6 @@
 # Domain Glossary
 
-The **ubiquitous language** of Qontext. Every code symbol, doc, commit
+The **ubiquitous language** of Better Context. Every code symbol, doc, commit
 message, and CLI command uses these names — no synonyms, no translations.
 
 ## Core graph

@@ -24,7 +24,7 @@ from backend.ingest.store import IngestStore
 if TYPE_CHECKING:
     from google.genai import types as _genai_types  # noqa: F401
 
-log = logging.getLogger("qontext.llm")
+log = logging.getLogger("better_context.llm")
 
 DEFAULT_MODEL = "gemini-2.5-flash"
 

@@ -3,12 +3,12 @@
 Usage:
   python -m backend.ingest dryrun <spec.yaml> <source-file> [--limit N]
   python -m backend.ingest run    <spec.yaml> <source-file> [--limit N] \\
-                                   [--db data/qontext.sqlite]
+                                   [--db data/better_context.sqlite]
   python -m backend.ingest onboard <source-file> --tenant <name> \\
                                     [--out ingest_specs/<tenant>/<name>.yaml] \\
-                                    [--db data/qontext.sqlite]
+                                    [--db data/better_context.sqlite]
   python -m backend.ingest promote --tenant <t> --source-pattern <p> --version <n>
-  python -m backend.ingest resolve-identity [--db data/qontext.sqlite]
+  python -m backend.ingest resolve-identity [--db data/better_context.sqlite]
 """
 from __future__ import annotations
 
@@ -138,14 +138,14 @@ def main(argv: list[str]) -> int:
     run.add_argument("spec")
     run.add_argument("source")
     run.add_argument("--limit", type=int, default=None)
-    run.add_argument("--db", default="data/qontext.sqlite")
+    run.add_argument("--db", default="data/better_context.sqlite")
     run.set_defaults(fn=_cmd_run)
 
     on = sub.add_parser("onboard")
     on.add_argument("source")
     on.add_argument("--tenant", required=True)
     on.add_argument("--out", default=None)
-    on.add_argument("--db", default="data/qontext.sqlite")
+    on.add_argument("--db", default="data/better_context.sqlite")
     on.add_argument("--sample-size", type=int, default=20)
     on.set_defaults(fn=_cmd_onboard)
 
@@ -153,11 +153,11 @@ def main(argv: list[str]) -> int:
     pr.add_argument("--tenant", required=True)
     pr.add_argument("--source-pattern", required=True)
     pr.add_argument("--version", type=int, required=True)
-    pr.add_argument("--db", default="data/qontext.sqlite")
+    pr.add_argument("--db", default="data/better_context.sqlite")
     pr.set_defaults(fn=_cmd_promote)
 
     ri = sub.add_parser("resolve-identity")
-    ri.add_argument("--db", default="data/qontext.sqlite")
+    ri.add_argument("--db", default="data/better_context.sqlite")
     ri.set_defaults(fn=_cmd_resolve_identity)
 
     args = p.parse_args(argv)

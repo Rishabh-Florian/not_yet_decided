@@ -1,9 +1,9 @@
-# Qontext Track — System Architecture & Design
+# Better Context Track — System Architecture & Design
 
 > **Implementation Status (2026-04-25).** This document is the original
 > aspirational design. The actual implementation has diverged in one
 > important way: instead of per-source hardcoded parsers + per-source LLM
-> extractors (the original Components 1 + 2), Qontext uses an
+> extractors (the original Components 1 + 2), Better Context uses an
 > **adaptive ingestion** layer driven by a `MappingSpec` per source.
 > See [Adaptive Ingestion (implemented)](#adaptive-ingestion-implemented)
 > below for the design that supersedes Components 1 + 2.
@@ -19,7 +19,7 @@
 
 ## Executive Summary
 
-**Qontext** is a system that transforms fragmented enterprise data (email, CRM, HR, IT tickets, chat, code repos, policies) into a **structured, inspectable, editable company memory** — a virtual file system backed by a knowledge graph with fact-level provenance. It is designed for both AI agents (efficient retrieval) and humans (inspect, validate, edit, extend).
+**Better Context** is a system that transforms fragmented enterprise data (email, CRM, HR, IT tickets, chat, code repos, policies) into a **structured, inspectable, editable company memory** — a virtual file system backed by a knowledge graph with fact-level provenance. It is designed for both AI agents (efficient retrieval) and humans (inspect, validate, edit, extend).
 
 The system ingests the Inazuma.co EnterpriseBench dataset (~50K records across 13 sources), resolves conflicts, extracts entities and relationships, and exposes the result as:
 
@@ -1138,7 +1138,7 @@ def search(query: str, scope: str, top_k: int) -> list[dict]: ...
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│  Qontext                    🔍 Search...         [Conflicts: 3] │
+│  Better Context              🔍 Search...         [Conflicts: 3] │
 ├──────────────┬───────────────────────────────────┬───────────────┤
 │              │                                   │               │
 │  VFS Tree    │        Main Content               │  Graph View   │
@@ -1234,7 +1234,7 @@ def search(query: str, scope: str, top_k: int) -> list[dict]: ...
 
 2. **Provenance is not an afterthought** — it's baked into every data structure from SourceRecord through GraphNode to VFS frontmatter. You can click any fact and trace it back to the exact JSON field in the exact source file.
 
-3. **Conflict resolution is a product feature, not a bug** — we surface conflicts explicitly, auto-resolve what we can, and give humans a proper UI for the rest. This is exactly what Qontext asked for: "involve humans where ambiguity actually matters."
+3. **Conflict resolution is a product feature, not a bug** — we surface conflicts explicitly, auto-resolve what we can, and give humans a proper UI for the rest. This is exactly what Better Context asked for: "involve humans where ambiguity actually matters."
 
 4. **MCP server** — the AI retrieval interface isn't just a REST API; it's a Model Context Protocol server that any Claude-based agent can use natively with tool calling. This is the most natural way for AI to "operate on" the context base.
 
@@ -1291,7 +1291,7 @@ def search(query: str, scope: str, top_k: int) -> list[dict]: ...
 ## Repository Structure
 
 ```
-qontext/
+better-context/
 ├── backend/
 │   ├── main.py                    # FastAPI app entry point
 │   ├── config.py                  # Settings, paths, model config

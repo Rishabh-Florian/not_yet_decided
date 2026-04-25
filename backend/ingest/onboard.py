@@ -34,7 +34,7 @@ from .spec import (
 from .store import IngestStore
 
 
-log = logging.getLogger("qontext.onboard")
+log = logging.getLogger("better_context.onboard")
 
 DEFAULT_SAMPLE_SIZE = 20
 

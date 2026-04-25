@@ -23,7 +23,7 @@ from .runtime import get_transformer
 _normalize_email = get_transformer("normalize_email")
 
 
-log = logging.getLogger("qontext.identity")
+log = logging.getLogger("better_context.identity")
 
 
 @dataclass
