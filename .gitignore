@@ -1,2 +1,37 @@
+# secrets
 .env
+.env.*
+!.env.example
+
+# python
+__pycache__/
 *.pyc
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# data
+data/
+*.sqlite
+*.sqlite-journal
+
+# os
+.DS_Store
+Thumbs.db
+
+# editor
+.vscode/
+.idea/
+*.swp
+
+# node / next
+node_modules/
+.next/
+dist/
+build/
+out/
+
+# skills (regenerable from skills-lock.json via skills-install.sh)
+.agents/
+.claude/skills/
