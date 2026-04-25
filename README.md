@@ -20,19 +20,21 @@ The graph is the **source of truth** for the system. Every entity is a node,
 every relationship is an edge, and every fact carries provenance metadata
 linking it back to the exact original record it came from.
 
-The store keeps four layers strictly separated, both in memory and on disk:
+The store keeps four layers strictly separated:
 
 | Layer | Where it lives | What it holds |
 |---|---|---|
-| **1. Graph** | NetworkX `MultiDiGraph` + SQLite `nodes`, `edges` | Entities and relationships (the structure) |
-| **2. Content (metadata)** | `nodes.attributes`, `edges.attributes` (JSON) | Typed, normalized fields for each node/edge |
+| **1. Graph** | Neo4j `:Entity` nodes + typed relationships | Entities and relationships (the structure) |
+| **2. Content (metadata)** | Neo4j `attributes_json` property on each node and relationship | Typed, normalized fields for each node/edge |
 | **3. Traces** | SQLite `provenance` | Fact-level extraction history: which source field, which extractor, which model, confidence |
 | **4. Raw data** | SQLite `source_records` | The original ingested records, stored verbatim, with content hash |
 
 A trace cannot exist without the raw record it points at — provenance has a
 foreign key to `source_records`, so the graph can never claim a fact whose
 origin has been lost. Conversely, raw records can sit unused (e.g. before
-extraction has run on them) without polluting the graph.
+extraction has run on them) without polluting the graph. Provenance refers to
+graph elements by `node_id` / `edge_id`; the graph is owned by Neo4j, so the
+store cascades those deletes manually when a node or edge is removed.
 
 ### Node
 
@@ -78,9 +80,10 @@ GraphEdge(
 )
 ```
 
-Edges are stored in a `MultiDiGraph`, so the same pair of nodes may be
+Neo4j is multi-relational by default, so the same pair of nodes may be
 connected by several edges of different `relation_type` (or the same type
-across different time windows).
+across different time windows). `relation_type` is used as the actual Neo4j
+relationship type and must match `[A-Za-z_][A-Za-z0-9_]*`.
 
 ### Provenance (trace)
 
@@ -118,11 +121,21 @@ cd backend
 pip install -r requirements.txt
 ```
 
+A running Neo4j is required (e.g. `docker run -p 7687:7687 -p 7474:7474 -e NEO4J_AUTH=neo4j/neo4j neo4j:5`). Configure the connection via env vars (defaults shown):
+
+```bash
+export NEO4J_URI=bolt://localhost:7687
+export NEO4J_USER=neo4j
+export NEO4J_PASSWORD=neo4j
+export NEO4J_DATABASE=neo4j
+```
+
 ```python
 from backend.graph import GraphStore
 from backend.models import GraphNode, GraphEdge, Provenance
 
-store = GraphStore("data/qontext.sqlite")
+store = GraphStore("data/qontext.sqlite")  # SQLite path for traces + raw data;
+                                            # Neo4j connection comes from env
 
 # 1. Ingest the raw record first.
 store.add_source_record(
@@ -165,7 +178,7 @@ backend/
 ├── models/
 │   └── graph.py        GraphNode, GraphEdge, Provenance, SourceRecord
 ├── graph/
-│   ├── schema.sql      nodes, edges, provenance, source_records
-│   └── store.py        GraphStore (NetworkX + SQLite, write-through)
+│   ├── schema.sql      provenance, source_records (SQLite)
+│   └── store.py        GraphStore (Neo4j for graph, SQLite for traces + raw)
 └── requirements.txt
 ```
