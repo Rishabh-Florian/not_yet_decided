@@ -1,0 +1,7 @@
+[
+  {"orderId": "ORD-001", "buyerEmail": "alice@acme.com", "buyerName": "Alice Wong", "amountUsd": 1250.00, "placedAt": "2025-09-12T14:23:00Z", "lineItems": [{"sku": "WIDGET-7", "qty": 5}]},
+  {"orderId": "ORD-002", "buyerEmail": "bob@globex.io", "buyerName": "Bob Singh", "amountUsd": 89.50, "placedAt": "2025-09-13T09:11:00Z", "lineItems": [{"sku": "WIDGET-3", "qty": 1}]},
+  {"orderId": "ORD-003", "buyerEmail": "carol@initech.org", "buyerName": "Carol Diaz", "amountUsd": 4400.00, "placedAt": "2025-09-13T16:48:00Z", "lineItems": [{"sku": "WIDGET-9", "qty": 22}]},
+  {"orderId": "ORD-004", "buyerEmail": "dan@umbrella.com", "buyerName": "Dan Patel", "amountUsd": 12.99, "placedAt": "2025-09-14T08:02:00Z", "lineItems": [{"sku": "WIDGET-2", "qty": 1}]},
+  {"orderId": "ORD-005", "buyerEmail": "alice@acme.com", "buyerName": "Alice Wong", "amountUsd": 320.00, "placedAt": "2025-09-15T11:30:00Z", "lineItems": [{"sku": "WIDGET-7", "qty": 1}]}
+]

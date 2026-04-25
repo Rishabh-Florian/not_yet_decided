@@ -1,5 +1,5 @@
 [project]
-name = "qontext"
+name = "better-context"
 version = "0.1.0"
 description = "Enterprise knowledge graph with fact-level provenance"
 requires-python = ">=3.11"

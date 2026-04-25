@@ -39,6 +39,7 @@ class Provenance:
     confidence: float
     raw_value: str
     extracted_at: datetime = field(default_factory=_now)
+    spec_version: int | None = None # MappingSpec version that produced this fact
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
@@ -78,7 +79,7 @@ class GraphEdge:
     attributes: dict[str, Any] = field(default_factory=dict)
     provenance: list[Provenance] = field(default_factory=list)
     confidence: float = 1.0
-    valid_from: datetime = field(default_factory=_now)
+    valid_from: datetime | None = field(default_factory=_now)
     valid_to: datetime | None = None
     id: str = field(default_factory=lambda: _new_id("edge"))
     version: int = 1

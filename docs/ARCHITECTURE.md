@@ -1,8 +1,25 @@
-# Qontext Track — System Architecture & Design
+# Better Context Track — System Architecture & Design
+
+> **Implementation Status (2026-04-25).** This document is the original
+> aspirational design. The actual implementation has diverged in one
+> important way: instead of per-source hardcoded parsers + per-source LLM
+> extractors (the original Components 1 + 2), Better Context uses an
+> **adaptive ingestion** layer driven by a `MappingSpec` per source.
+> See [Adaptive Ingestion (implemented)](#adaptive-ingestion-implemented)
+> below for the design that supersedes Components 1 + 2.
+>
+> | Subsystem | Status | Notes |
+> |---|---|---|
+> | Knowledge graph store (Neo4j + SQLite hybrid) | ✅ implemented | `backend/graph/` |
+> | Fact-level provenance + raw record store | ✅ implemented | `source_records`, `provenance` |
+> | Adaptive ingestion (MappingSpec / Onboarder / Ingestor) | ✅ implemented | `backend/ingest/` (this doc, see below) |
+> | Identity resolution (deterministic email match → SAME_AS) | ✅ implemented (light) | fuzzy / LLM triage stubbed |
+> | LLM-extraction blocks at ingest time | ✅ implemented | opt-in per-spec, cached |
+> | VFS materialization, REST API, MCP server, web UI, vector index, conflict detector UI | ❌ not yet | original design retained below |
 
 ## Executive Summary
 
-**Qontext** is a system that transforms fragmented enterprise data (email, CRM, HR, IT tickets, chat, code repos, policies) into a **structured, inspectable, editable company memory** — a virtual file system backed by a knowledge graph with fact-level provenance. It is designed for both AI agents (efficient retrieval) and humans (inspect, validate, edit, extend).
+**Better Context** is a system that transforms fragmented enterprise data (email, CRM, HR, IT tickets, chat, code repos, policies) into a **structured, inspectable, editable company memory** — a virtual file system backed by a knowledge graph with fact-level provenance. It is designed for both AI agents (efficient retrieval) and humans (inspect, validate, edit, extend).
 
 The system ingests the Inazuma.co EnterpriseBench dataset (~50K records across 13 sources), resolves conflicts, extracts entities and relationships, and exposes the result as:
 
@@ -88,7 +105,256 @@ The system ingests the Inazuma.co EnterpriseBench dataset (~50K records across 1
 
 ---
 
+## Adaptive Ingestion (implemented)
+
+> **The pipeline is company-data agnostic by design.** A single `Ingestor`
+> instance handles records from any CRM, HR, ITSM, or comms vendor as long
+> as the data is readable as JSON / JSONL / NDJSON / CSV. There are no
+> per-vendor parsers, no per-vendor extractors, and no per-vendor branches
+> in code. Every difference between vendors is expressed in the
+> `MappingSpec` YAML, never in Python.
+>
+> This is verified by `backend/test_ingest_agnostic.py`: four
+> deliberately-different vendor payload shapes (HubSpot-like nested
+> `properties`, Salesforce-like `attributes` envelope with `IsDeleted`
+> flag, Microsoft Dynamics OData with `@odata.etag` and `_lookup_value`
+> fields, Pipedrive-like `primary_email[*]` arrays) ingested through the
+> same `Ingestor` collapse to identical canonical `Person` nodes. Every
+> node carries a `Provenance` row pointing back to its original
+> vendor-specific field path, so downstream queries are vendor-blind.
+
+The original design (Components 1 + 2 below) assumed a fixed set of vendors
+and one hand-coded parser per source file. That doesn't generalize: real
+deployments see different companies and different departments shipping data
+under different schemas, with different field names, casings, and
+conventions. Hard-coding parsers per vendor is operationally fatal.
+
+The implemented ingestion layer replaces that with a **schema-on-onboard**
+design: an LLM (Gemini Flash 2.5) drafts a `MappingSpec` ONCE per
+(tenant, source-file). After human review, that spec drives a fully
+deterministic `Ingestor` for every record, forever. The LLM is never in the
+per-record path for structured data.
+
+```
+   ┌─────────────────────────────────────────────────────────────┐
+   │  ONBOARD (one-time, per source)                              │
+   │                                                              │
+   │   sample N records                                           │
+   │       │                                                      │
+   │       ▼                                                      │
+   │   Onboarder ─── Gemini Flash 2.5 ──▶  MappingSpec (YAML)     │
+   │       │           (response_schema = MappingSpec JSON Schema)│
+   │       │                                                      │
+   │       ▼                                                      │
+   │   pydantic + canonical-registry validation                   │
+   │   one-shot self-repair on failure                            │
+   │       │                                                      │
+   │       ▼                                                      │
+   │   stamp `required_paths_hash` + `type_fingerprint`           │
+   │   persist to mapping_specs (status='draft')                  │
+   │   human reviews YAML, edits, then `promote` → status='active'│
+   └─────────────────────────────────────────────────────────────┘
+
+   ┌─────────────────────────────────────────────────────────────┐
+   │  RUN (every record, deterministic)                           │
+   │                                                              │
+   │   active spec ──▶ drift check (paths_hash + type_fingerprint)│
+   │                       │                                      │
+   │            mismatch → DriftError, abort run                  │
+   │                       │ ok                                   │
+   │                       ▼                                      │
+   │   for each record:                                           │
+   │     idempotency: skip if (spec_v, file, id, hash) seen       │
+   │     add_source_record  (verbatim raw)                        │
+   │     apply NodeRules    → MERGE on id_template                │
+   │                          (last-write-wins attrs, prov appends)│
+   │     apply EdgeRules    → MERGE on sha256(src|rel|tgt)        │
+   │     run LLMExtraction blocks (opt-in, cached, grounded,      │
+   │                              confidence_floor, capped)        │
+   │                       │                                      │
+   │            failure on this record → dead_letter, continue    │
+   │                                                              │
+   │   close run; record ledger row (records_in/out/dead/...)     │
+   └─────────────────────────────────────────────────────────────┘
+
+   ┌─────────────────────────────────────────────────────────────┐
+   │  RESOLVE IDENTITY (post-pass, optional)                      │
+   │                                                              │
+   │   IdentityResolver.resolve():                                │
+   │     cluster Person nodes by normalized email                 │
+   │     emit SAME_AS edges between members of each cluster       │
+   │     (does NOT merge; preserves provenance per source)        │
+   └─────────────────────────────────────────────────────────────┘
+```
+
+### Why this absorbs vendor heterogeneity
+
+| Difference between two vendors | Where it's absorbed |
+|---|---|
+| Different field names (`sender_emp_id` vs `from_id`) | `FieldMap.source` JSONPath in the spec |
+| Same field, different format (ISO date vs epoch int) | `FieldMap.transform` chain (`parse_iso_datetime`, `lowercase`, `normalize_email`, …) |
+| Field optional in some sources | `coalesce` list of paths: `source: [$.dob, $.date_of_birth, $.birthDate]` |
+| Same concept, different type names ("Staff", "Employee", "TeamMember") | `canonical_aliases: { Staff: Person }` |
+| New unstructured field worth extracting (email body → mentions) | `llm_blocks` entry — opt-in, cached, grounded |
+| Vendor changes their export format | Drift-hash mismatch aborts the run; never silent re-inference |
+| Same person under multiple ids across sources | Post-pass `IdentityResolver` emits `SAME_AS` edges |
+
+### LLM usage policy (load-bearing)
+
+The LLM is **not** in the per-record hot path for structured data. Three
+bounded uses only:
+
+1. **Initial schema alignment** — `Onboarder.draft_spec` runs Gemini Flash
+   2.5 ONCE per (tenant, source-file). Output: a YAML `MappingSpec`.
+2. **Opt-in extraction on explicitly unstructured fields** — `LLMExtraction`
+   blocks declared in the spec (e.g. email-body → `MENTIONS`). Cached by
+   `cache_key`, gated by `confidence_floor`, grounded against the source
+   span (`require_grounding: true` rejects pure hallucinations), capped by
+   `max_extractions_per_record`. A spec with no `llm_blocks` ⇒ zero LLM
+   calls during ingestion.
+3. **One-shot self-repair on drafted specs** — if pydantic validation of a
+   Gemini-drafted spec fails, the validator error is sent back ONCE for
+   repair.
+
+Explicitly **not** used as a fallback:
+- Missing required field → record goes to `dead_letter`, never to an LLM
+  guess.
+- Schema drift → run aborts via `required_paths_hash` /
+  `type_fingerprint` mismatch, never silent LLM re-inference.
+- Type coercion / casing / date-parsing → `runtime` transformer registry,
+  never an LLM call.
+
+### Canonical type registry
+
+Anchors the type space across vendors. Lives in
+`backend/ingest/canonical.yaml`, edited as data not code. Specs that
+reference unknown types fail at load.
+
+| Node types | Relation types (subset) |
+|---|---|
+| Person, Organization, Document, Message, Event, Asset, Topic | MEMBER_OF, REPORTS_TO, WORKS_ON, OWNS, AUTHORED, SENT, RECEIVED, MENTIONS, PART_OF, PURCHASED, ASSIGNED_TO, TAGGED, RELATED_TO, SAME_AS |
+
+### MappingSpec shape (abridged)
+
+```yaml
+spec_version: 1
+tenant: enterprisebench
+source:
+  file_pattern: Enterprise_mail_system/emails.json
+  format: json                # json | jsonl | ndjson | csv
+  record_path: $[*]
+canonical_aliases:
+  Email: Message
+  Employee: Person
+nodes:
+  - name: email
+    canonical_type: Message
+    id_template: "email:{email_id}"
+    fields:
+      - { attribute: subject, source: $.subject }
+      - { attribute: sent_at, source: $.date, transform: [parse_iso_datetime] }
+  - name: sender
+    canonical_type: Person
+    id_template: "person:{sender_emp_id}"
+    when: { not_null: $.sender_emp_id }
+    fields:
+      - { attribute: emp_id, source: $.sender_emp_id }
+      - { attribute: email,  source: $.sender_email, transform: [normalize_email] }
+edges:
+  - { canonical_type: SENT,     source_node: "@sender", target_node: "@email" }
+  - { canonical_type: RECEIVED, source_node: "@email",  target_node: "@recipient" }
+llm_blocks:                     # optional, opt-in only
+  - name: mentions_in_body
+    input_source: $.body
+    prompt_template: "Extract Person/Organization/Topic references from this email body..."
+    output_schema: { type: object, properties: {...} }
+    confidence_floor: 0.7
+    require_grounding: true
+    max_extractions_per_record: 50
+    cache_key: ["$.email_id"]
+required_paths_hash: <sha256>   # stamped at onboarding
+type_fingerprint: { ... }        # stamped at onboarding
+```
+
+### Ingestion control plane (SQLite)
+
+| Table | Purpose |
+|---|---|
+| `mapping_specs` | versioned MappingSpec YAML, status ∈ {draft, active, retired} |
+| `llm_cache` | cached structured outputs keyed by sha256(model | prompt | inputs); raw model output preserved alongside parsed |
+| `ingest_runs` | one row per `Ingestor.run` invocation (counts, status, timestamps) |
+| `ingest_runs_records` | idempotency: `(spec_version, source_file, source_record_id, content_hash)` |
+| `dead_letter` | per-record failures with reason + raw record |
+
+### Atomicity and dedup
+
+- `add_node` and `add_edge` are now `MERGE`-on-id (not `CREATE`). Re-ingestion
+  of the same record is a no-op on graph structure; provenance traces are
+  appended.
+- Edge ids are deterministic: `sha256(src|rel|tgt|valid_from)`. Same fact
+  ingested twice doesn't create duplicate relationships.
+- Per-record write order: stage SQLite provenance → run Neo4j MERGE →
+  commit SQLite. On Neo4j failure, SQLite rolls back. On SQLite-commit
+  failure, the just-merged Neo4j node/edge is compensated by id.
+- Type-collision protection: an id with a different `canonical_type` than
+  the existing node raises rather than silently merging (e.g. refuses to
+  promote a Person id into an Organization).
+
+### Files (implementation)
+
+```
+backend/
+  config.py                  load_dotenv() + env constants
+  graph/
+    schema.sql               raw + provenance + ingestion-control-plane tables
+    store.py                 GraphStore (Neo4j + SQLite, MERGE-based)
+  ingest/
+    canonical.yaml           canonical type registry (data, not code)
+    spec.py                  pydantic MappingSpec + canonical-registry loader
+    runtime.py               JSONPath + transformers + predicates + drift
+    store.py                 control-plane SQLite (mapping_specs, llm_cache, runs, dead_letter)
+    llm.py                   GeminiClient + JSON-Schema sanitizer + cache
+    onboard.py               Onboarder.draft_spec()
+    ingestor.py              Ingestor.run() + LLM-block runner
+    identity.py              IdentityResolver (deterministic email match)
+    __main__.py              CLI: dryrun / run / onboard / promote / resolve-identity
+  test_ingest_agnostic.py    cross-vendor agnosticism proof (4 shapes, 1 Ingestor)
+ingest_specs/
+  enterprisebench/
+    emails.yaml              hand-written reference spec
+```
+
+### Honest scope: covered formats vs. shim-required
+
+**Works out of the box** (`Ingestor` reads natively):
+- JSON arrays, JSONL, NDJSON, CSV — covers most CRM exports and most REST
+  API responses once they're saved to disk.
+- Arbitrarily nested JSON via JSONPath (`$.properties.email`,
+  `$.contact.address.city`).
+- Array-of-objects fields via `[*]` wildcards
+  (`$.primary_email[*].value`).
+
+**Needs a small shim** (~10 lines each, isolated to `_iter_records`):
+- Live API ingestion (Salesforce REST, HubSpot API, Pipedrive API…) —
+  fetch, dump JSON, run `Ingestor`. The spec doesn't care if records came
+  from a file or HTTP.
+- Excel `.xlsx` — `pandas.read_excel(...).to_csv(...)`, or extend
+  `_iter_records`.
+- XML / SOAP — `xmltodict` to JSON, ingest as JSON.
+- SQL dumps — export per-table to CSV.
+
+**Out of scope today**: live streaming, binary attachments (PDFs, images),
+schema discovery from a database catalog. Each is a localized change to
+`_iter_records`; the rest of the pipeline is format-blind.
+
+---
+
 ## Component Design
+
+> The components below describe the **original** monolithic design.
+> Components 1 (Source Parsers) and 2 (Entity Extractor) have been
+> superseded by the [Adaptive Ingestion](#adaptive-ingestion-implemented)
+> layer above and are kept only as historical context.
 
 ### Component 1: Source Parsers
 
@@ -872,7 +1138,7 @@ def search(query: str, scope: str, top_k: int) -> list[dict]: ...
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│  Qontext                    🔍 Search...         [Conflicts: 3] │
+│  Better Context              🔍 Search...         [Conflicts: 3] │
 ├──────────────┬───────────────────────────────────┬───────────────┤
 │              │                                   │               │
 │  VFS Tree    │        Main Content               │  Graph View   │
@@ -968,7 +1234,7 @@ def search(query: str, scope: str, top_k: int) -> list[dict]: ...
 
 2. **Provenance is not an afterthought** — it's baked into every data structure from SourceRecord through GraphNode to VFS frontmatter. You can click any fact and trace it back to the exact JSON field in the exact source file.
 
-3. **Conflict resolution is a product feature, not a bug** — we surface conflicts explicitly, auto-resolve what we can, and give humans a proper UI for the rest. This is exactly what Qontext asked for: "involve humans where ambiguity actually matters."
+3. **Conflict resolution is a product feature, not a bug** — we surface conflicts explicitly, auto-resolve what we can, and give humans a proper UI for the rest. This is exactly what Better Context asked for: "involve humans where ambiguity actually matters."
 
 4. **MCP server** — the AI retrieval interface isn't just a REST API; it's a Model Context Protocol server that any Claude-based agent can use natively with tool calling. This is the most natural way for AI to "operate on" the context base.
 
@@ -1025,7 +1291,7 @@ def search(query: str, scope: str, top_k: int) -> list[dict]: ...
 ## Repository Structure
 
 ```
-qontext/
+better-context/
 ├── backend/
 │   ├── main.py                    # FastAPI app entry point
 │   ├── config.py                  # Settings, paths, model config
