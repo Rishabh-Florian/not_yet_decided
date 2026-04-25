@@ -34,4 +34,4 @@ out/
 
 # skills (regenerable from skills-lock.json via skills-install.sh)
 .agents/
-.claude/skills/
+.claude/
