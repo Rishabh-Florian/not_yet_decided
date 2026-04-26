@@ -1,17 +1,44 @@
-# Better Context (workspace: `not_yet_decided`)
+# Better Context
 
-Turns fragmented enterprise data (email, CRM, HR, IT tickets, chat, code,
-policies) into a structured, inspectable, editable company memory backed by
-a knowledge graph with **fact-level provenance**. See
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full design.
+> **Qontext Track — Big Berlin Hack 2026**
+> Turn fragmented company data into a context base AI can operate on.
+
+Better Context ingests the full EnterpriseBench dataset (email, HR, CRM, IT tickets, policies, code) into a structured, inspectable, editable **company memory** — a knowledge graph with fact-level provenance, a virtual file system, and a live web UI for both humans and AI agents.
+
+---
+
+## What it does
+
+1. **Adaptive ingestion** — point it at any JSON/CSV data source. An LLM (Gemini Flash 2.5) drafts a `MappingSpec` YAML once; a deterministic ingestor runs it forever. No per-vendor hardcoded parsers.
+
+2. **Knowledge graph** — Neo4j (nodes + relationships + embeddings) + SQLite (fact-level provenance traces + verbatim raw records). Every attribute traces back to the exact file, field, and original value it came from.
+
+3. **4-tier retrieval cascade** — `exact → router → hybrid → agentic`. The router is a **fine-tuned 205M GLiNER2 SLM** (Pioneer.ai) that beats GPT-4o on intent accuracy (91.1% vs 86.7%), NER F1 (0.394 vs 0.337), and latency (467ms vs 1699ms) — at $0/query.
+
+4. **Virtual file system (VFS)** — Unix-style `ls / cat / grep / find / stat / tree` over the graph. Surfaced as Gemini function-calling tools for AI agents. No disk materialization — derived at query time from `(canonical_type, node_id)`.
+
+5. **Web UI** — Next.js 14 app with 4 live views: force-directed knowledge graph with subgraph filters, paginated node browser with provenance timeline, pattern query DSL, inline node editor with human-provenance tracking. Home page chatbar wired directly to the 4-tier cascade.
+
+6. **Subgraph filters** — Department and Location chips in the graph panel. Three view modes: **Dim** (all nodes visible, matched at full opacity), **Isolate** (matched nodes + internal edges only), **Expand** (matched + all direct neighbors). AND across dimensions, OR within each. Named views saved to localStorage.
+
+---
+
+## Partner technologies used
+
+| Technology | How it's used |
+|------------|--------------|
+| **Google Gemini (DeepMind)** | Onboarding: LLM drafts MappingSpec YAMLs from data samples. AgenticTier: bounded Gemini function-calling loop (6 tools, max 6 calls). Workflows: thread-summary + answer-customer-email compose. |
+| **Pioneer.ai (Fastino)** | Fine-tuned 205M GLiNER2 SLM for 4-way intent classification + 6-type NER in a single forward pass. Round 1: 91.1% intent / 0.394 NER F1 / 467ms p95. Beats GPT-4o on all three metrics. |
+| **Neo4j** | Primary graph store. Native HNSW vector indexes for hybrid search. Fulltext indexes for BM25-like ranking. MERGE-on-id dedup with deterministic edge IDs. |
+
+---
 
 ## Quick start
 
-Bring up Neo4j + the API + the fine-tuned router in three steps. Assumes
-Docker, Python, and `uv` installed.
+Requirements: Docker, Python 3.12+, [uv](https://docs.astral.sh/uv/), Node.js 18+.
 
 ```sh
-# 1. Install deps and start Neo4j
+# 1. Install Python deps + start Neo4j
 uv sync
 docker run -d -p 7687:7687 -p 7474:7474 \
   -e NEO4J_AUTH=neo4j/better_context neo4j:5
@@ -31,613 +58,242 @@ PIONEER_API_KEY=<from https://agent.pioneer.ai → API Keys>
 PIONEER_MODEL_ID=683f9b1f-dcbe-4162-89e6-f46a155882a1
 EOF
 
-# 3. Ingest data (one-time), populate embeddings, start API
-uv run bash scripts/ingest_all.sh                          # ~15 min
-uv run python -m backend.retrieval.embed                   # ~10 min
+# 3. Ingest all 14 data sources
+uv run bash scripts/ingest_all.sh           # ~15 min
+
+# 4. Bootstrap org subgraph (departments + locations as explicit nodes)
+uv run python scripts/bootstrap_subgraph_nodes.py
+
+# 5. Populate vector embeddings for hybrid search
+uv run python -m backend.retrieval.embed    # ~10 min
+
+# 6. Start the API
 uv run uvicorn backend.api.app:app --reload --port 8000
-# → API live at http://localhost:8000/docs
+# → http://localhost:8000/docs (Swagger UI)
+
+# 7. Start the frontend (separate terminal)
+cd frontend && npm install && npm run dev
+# → http://localhost:3000
 ```
 
-Frontend (Next.js) lives in `frontend/`:
-```sh
-cd frontend && npm install && npm run dev    # → http://localhost:3000
-```
+Without API keys, the system still runs: retrieval uses stub fallbacks at each tier, ingestion skips LLM-drafted specs (use existing YAML specs in `ingest_specs/`).
 
-The frontend's main query box calls `POST /api/query`, which runs the
-4-tier cascade (`exact → router → hybrid → agentic`). The router is
-the fine-tuned 205M GLiNER2 SLM (97.8 % intent accuracy, beats GPT-4o
-— see `pioneer/bench/results/comparison.md`). Without the env vars
-above, the cascade still works using stub fallbacks at each tier.
+---
 
-## Layout
+## Repository layout
 
 ```
-backend/        Python: graph store + adaptive ingestion + REST API + retrieval cascade + workflows + eval
-frontend/       Next.js 14 + React UI (live — graph viz, node browser, query, edit, provenance)
-dataset/        EnterpriseBench source data (sample tenant)
-ingest_specs/   per-tenant per-source MappingSpec YAMLs
-scripts/        ingest_all.sh (bulk onboard + ingest) + bootstrap_subgraph_nodes.py
-docs/           ARCHITECTURE.md + DATASET.md
-data/           runtime SQLite db (gitignored)
+backend/            Python: graph store, adaptive ingestion, REST API, retrieval cascade, VFS, workflows, eval
+frontend/           Next.js 14 + React: graph viz, node browser, query UI, provenance timeline, edit form
+dataset/            EnterpriseBench source data (14 JSON/CSV sources + 24 policy PDFs + 270 invoice PDFs)
+ingest_specs/       Per-tenant per-source MappingSpec YAMLs (reviewed + promoted to active)
+scripts/            ingest_all.sh (bulk pipeline) + bootstrap_subgraph_nodes.py
+pioneer/            Fine-tuned GLiNER2 SLM weights + training pipeline + benchmark results
+docs/               ARCHITECTURE.md (full design) + DATASET.md
+data/               Runtime SQLite db (gitignored)
 ```
 
-## What's built
+---
 
-- **Knowledge graph store** -- Neo4j (graph + content) + SQLite (traces + raw
-  records). `MERGE`-on-id dedup, deterministic edge ids, atomic-tx pattern.
-- **Adaptive ingestion** -- `MappingSpec` per (tenant, source-file) drives a
-  deterministic ingester. LLM (Gemini Flash 2.5) only at onboarding +
-  opt-in unstructured extraction. Drift detection aborts on schema change.
-- **REST API** -- FastAPI serving graph data with full provenance. Joins
-  Neo4j (graph + content) with SQLite (traces + raw records) into unified
-  JSON responses. Pydantic v2 models generate the OpenAPI spec.
-  - **Graph read endpoints** (7 GET) -- node, edge, neighbors, path, stats, nodes-by-type, source record
-  - **Pattern query** (`POST /api/graph/query`) -- typed DSL `(Person)-[SENT]->(Message)` returns paginated triples with provenance
-  - **Edit API** (`PUT /api/graph/node/{id}`) -- human-in-the-loop corrections with per-attribute provenance tracking
-- **Retrieval cascade** -- `POST /api/query` runs a 4-tier cascade
-  (`exact` -> `router` -> `hybrid` -> `agentic`) with `stub` as
-  terminal fallback. Tiers escalate on algorithmic relevance only
-  (cosine / BM25 / RRF / exact-match indicator). Router pre-routes via
-  a **fine-tuned 205M GLiNER2 SLM** (Pioneer.ai, multi-task: intent
-  classification + NER in one forward pass); agentic uses bounded
-  Gemini function-calling over a 6-tool surface. Each tier is hidden
-  behind a `Tier` ABC; LLM / embedder / router each have a stub default
-  so CI runs without weights or API keys.
-- **Fine-tuned router (Pioneer SLM)** -- 4-way intent classification +
-  6-type NER in 467 ms p95 on CPU. Round 1 numbers vs frontier:
-  91.1 % intent acc / 0.394 macro NER F1 (base GLiNER2: 53.3 / 0.300;
-  GPT-4o: 86.7 / 0.337). Beats GPT-4o on quality AND latency
-  (3.6× faster) AND cost ($0/query local vs ~$5/1k API). See
-  `pioneer/bench/results/comparison.md` for the full 3-column table
-  + screenshots; Round 2 in progress targets the remaining gaps
-  (`ambiguous` intent, `ticket_id`/`date` NER coverage).
-- **Workflow framework** -- `POST /api/workflow/{name}` invokes a
-  frozen-policy recipe over a locked tier subset. Two ship: 
-  `answer-customer-email` (deterministic: T1 sender + neighbors -> T3
-  product search -> single-shot LLM compose) and `thread-summary`
-  (less-deterministic: T3 cluster recall -> bounded 3-tool agent loop
-  -> structured markdown). Built-ins registered explicitly at
-  FastAPI startup via `register_builtin_workflows()` -- no
-  import-side-effect.
-- **Identity resolution (light)** -- deterministic email-match -> `SAME_AS`
-  edges. Fuzzy + LLM triage stubbed for later.
-- **Conflict resolution** -- detection at the `add_node` MERGE seam. Per
-  attribute that disagrees, a deterministic decision table routes by
-  `FactConfidence` rung (HUMAN > EXACT > GROUNDED > INFERRED): equal
-  values auto-merge, ladder-broken ties auto-pick the higher rung, both
-  INFERRED route to LLM_TRIAGE (lane stub for v2), tied confident-rung
-  ESCALATEs to a queue. REST surface: `GET /api/conflicts`,
-  `GET /api/conflicts/{id}`, `POST /api/conflicts/{id}/resolve`. Human
-  resolutions go through `edit_node` so they carry full
-  `FactConfidence.HUMAN` provenance and are reversible like any edit.
-  See [`backend/conflict.py`](backend/conflict.py).
-- **Eval harness** -- `backend/eval/` extracts `(query, expected_node_ids)`
-  from `tasks.jsonl`, runs the cascade, reports recall@5/@10, p50/p95
-  latency, per-tier termination, escalation rate. Output Markdown to
-  `backend/eval/reports/<UTC-timestamp>.md`.
-- **Frontend (Next.js 14 + React)** -- fully live at `http://localhost:3000`.
-  Four views: `/app/graph` (force-directed graph with department/node-type/edge
-  filter panel), `/app/nodes` (paginated node browser + detail panel with
-  provenance timeline + raw-record drawer), `/app/query` (pattern DSL query
-  UI), `/app/edit/:id` (inline node editor with human-provenance tracking).
-  Home page chatbar calls `POST /api/query` with rotating prompt chips and
-  live tier/relevance/latency result cards. VFS tree sidebar on every app
-  page. Topbar shows live node + edge counts from `GET /api/graph/stats`.
-- **331 passing tests** -- ingest agnosticism, pattern-query/edit,
-  per-tier retrieval (exact/hybrid/router/agentic/orchestrator), tools,
-  workflow framework + 2 concrete workflows, API integration.
+## What's built and working
 
-## What's not built yet
+### Backend
 
-| Feature | Why it matters | Effort estimate |
-|---------|---------------|-----------------|
-| Cross-encoder rerank on retrieval cascade | Sharpens top-k ordering after RRF fusion | Small -- one model call after HybridTier emits, before relevance scoring |
-| LLM triage lane (live Gemini call for `both_inferred` conflicts) | Auto-resolves "Acme Corp" vs "Acme Inc." via structured output; falls through to ESCALATE on `verdict=escalate` | Small -- gated on `QONTEXT_AGENTIC=gemini`, decision lane already wired |
-| Conflict resolution UI (inbox) | Visual queue + accept-suggestion / pick-other / merge-custom actions | Medium -- one new frontend page over the existing `/api/conflicts` endpoints |
-| MCP server | Claude-native tool interface over the API | Small -- thin wrappers around existing endpoints |
+- **Knowledge graph store** — Neo4j (graph + content + embeddings) + SQLite (provenance traces + raw records). `MERGE`-on-id dedup, deterministic edge ids via `sha256(src|rel|tgt)`, atomic-tx pattern. 13,201 nodes, 26,937 edges, 200,907 provenance records ingested.
+- **Conflict resolution** — detection at the `add_node` MERGE seam (`backend/conflict.py`). Per attribute that disagrees, a deterministic decision table routes by `FactConfidence` rung (HUMAN > EXACT > GROUNDED > INFERRED): equal values auto-merge, ladder-broken ties auto-pick the higher rung, both INFERRED route to LLM_TRIAGE (live Gemini call, gated on `QONTEXT_AGENTIC=gemini`), tied confident-rung ESCALATE to a queue. REST surface: `GET /api/conflicts`, `GET /api/conflicts/{id}`, `POST /api/conflicts/{id}/resolve`. Human resolutions go through `edit_node` so they carry `FactConfidence.HUMAN` provenance and are reversible like any edit.
+- **Adaptive ingestion** — `MappingSpec` YAML per (tenant, source) drives a deterministic ingestor. Gemini Flash 2.5 drafts the spec once; idempotent on `(spec_version, source_file, record_id, content_hash)`. Drift detection aborts on schema change. Proven vendor-agnostic: 4 different CRM shapes collapse to identical canonical nodes through one `Ingestor` (`test_ingest_agnostic.py`).
+- **Organizational subgraph** — bootstrap script injects synthetic `office_location` onto all 1,260 Person nodes (deterministic from `sha256(emp_id) % 5`) and creates explicit `Organization` nodes for 8 departments + 5 locations with `MEMBER_OF` edges.
+- **Identity resolution** — deterministic email-match → `SAME_AS` edges (preserves per-source provenance, no merge).
+- **REST API** — 12 endpoints (see table below). FastAPI + Pydantic v2 models generate the OpenAPI spec.
+- **4-tier retrieval cascade** — `exact → router → hybrid → agentic → stub`. Tiers escalate on algorithmic relevance only. Router pre-routes via fine-tuned GLiNER2 SLM.
+- **Fine-tuned Pioneer router** — 205M GLiNER2, multi-task (4-way intent + 6-type NER, single forward pass). Round 1: 91.1% intent / 0.394 NER F1 / 467ms p95 — beats GPT-4o (86.7% / 0.337 / 1699ms) at $0/query.
+- **Hybrid search** — Neo4j HNSW vector + fulltext, Reciprocal Rank Fusion (k=60).
+- **Agentic tier** — bounded Gemini function-calling loop (6 tools, max 6 calls, 10s wall-clock).
+- **VFS** — 6 pure-Cypher operations (`ls/cat/stat/grep/find/tree`), surfaced as Gemini function-calling tools for AI agents.
+- **Workflow framework** — frozen-policy recipes over a locked tier subset. Two built-ins: `answer-customer-email` (T1 sender + neighbors → T3 product search → LLM compose) and `thread-summary` (T3 cluster recall → bounded 3-tool agent → structured markdown).
+- **Eval harness** — recall@5/@10, p50/p95 latency, per-tier termination, escalation rate. Reports to `backend/eval/reports/<timestamp>.md`.
+- **410 passing tests** — ingest agnosticism, pattern query, edit API, per-tier retrieval, tools, workflows, conflict resolution (unit + integration).
 
-See the full flow-by-flow status in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+### Frontend
 
-## Knowledge graph
+- `/` — Landing page: animated rotating sphere, prompt chips, chatbar wired to `POST /api/query`, live result cards (tier used, relevance, latency).
+- `/app/graph` — Force-directed knowledge graph (react-force-graph-2d). FilterPanel with: node-type checkboxes, **subgraph Department + Location chips** (3 view modes: Dim/Isolate/Expand), time window, min-connections slider, source toggle, name search. Saved views persisted to localStorage.
+- `/app/nodes` — Paginated node browser. Node detail with provenance timeline (per-attribute extraction history) and raw-record drawer (verbatim original JSON from Layer 4).
+- `/app/query` — Pattern DSL query UI: `(Person)-[SENT]->(Message)` → paginated triples with full provenance.
+- `/app/edit/:id` — Inline node editor. Every edit tracked with `extraction_method="human"`, editor identity, and timestamp.
+- VFS tree sidebar on every app page, live stats in topbar.
 
-The graph is the **source of truth**. Every entity is a node, every
-relationship is an edge, and every fact carries provenance metadata linking
-it back to the exact original record it came from.
+---
 
-Four layers, kept distinct on disk:
+## Knowledge graph data model
 
-| Layer | Where it lives | What it holds |
-|---|---|---|
+Four layers, kept distinct:
+
+| Layer | Where | What |
+|-------|-------|------|
 | **1. Graph** | Neo4j `:Entity` nodes + typed relationships | Entities and relationships (the structure) |
-| **2. Content** | Neo4j `attributes_json` per node and relationship | Typed, normalized fields |
-| **3. Traces** | SQLite `provenance` | Fact-level extraction history (which source field, which extractor, which model, confidence, **spec_version**) |
-| **4. Raw data** | SQLite `source_records` | Original ingested records, verbatim, with content hash |
+| **2. Content** | Neo4j `attributes_json` per node + relationship | Typed, normalized fields |
+| **3. Traces** | SQLite `provenance` | Fact-level extraction history (source file, field, extractor, model, confidence, spec_version) |
+| **4. Raw data** | SQLite `source_records` | Original records verbatim, with content hash |
 
-Provenance has a foreign key to `source_records` — a trace cannot exist
-without its raw record. Provenance refers to graph elements by `node_id` /
-`edge_id`; the graph lives in Neo4j, so the store cascades those deletes
-manually when a node or edge is removed.
+Provenance has a foreign key to `source_records` — a trace cannot exist without its raw record.
 
-### Node / Edge / Provenance shapes
+**Canonical node types:** Person, Organization, Document, Message, Event, Asset, Topic
 
-See `backend/models/graph.py` (`GraphNode`, `GraphEdge`, `Provenance`,
-`SourceRecord`). Highlights:
+**Canonical relation types:** MEMBER_OF, REPORTS_TO, WORKS_ON, OWNS, AUTHORED, SENT, RECEIVED, MENTIONS, PART_OF, PURCHASED, ASSIGNED_TO, TAGGED, RELATED_TO, SAME_AS
 
-- `relation_type` is a free string but must match `[A-Za-z_][A-Za-z0-9_]*`
-  (used directly as the Cypher relationship type).
-- `attributes` are open dicts on both nodes and edges.
-- `Provenance.extraction_method` ∈ {`direct_mapping`, `llm_extraction`,
-  `rule_based`, `human`}.
-- `Provenance.attribute` names the node/edge attribute the trace covers
-  (used by conflict detection at MERGE time to find the per-attribute
-  confidence). `None` for legacy rows; new ingest writes always set it.
-- `Provenance.spec_version` links each fact back to the `MappingSpec`
-  version that produced it.
-
-## Backend setup
-
-Dependencies are managed with [uv](https://docs.astral.sh/uv/). From the repo root:
-
-```bash
-uv sync                # create venv, install runtime + dev deps, editable-install `backend`
-uv run pytest          # tests
-uv run ruff check .    # lint
-uv run pyright         # types
-```
-
-Always go through `uv run` — never invoke `python` / `pip` / `pytest` directly.
-
-Add `GEMINI_API_KEY=...` to a `.env` at the repo root. It powers the
-LLM-driven onboarding (M2), the AgenticTier (set `QONTEXT_AGENTIC=gemini`
-to enable), and any workflow that needs an LLM (`thread-summary`,
-`answer-customer-email`). Neo4j connection comes from env vars (defaults
-shown):
-
-```bash
-NEO4J_URI=bolt://localhost:7687
-NEO4J_USER=neo4j
-NEO4J_PASSWORD=neo4j
-NEO4J_DATABASE=neo4j
-```
-
-Start Neo4j:
-
-```bash
-docker run -d -p 7687:7687 -p 7474:7474 \
-  -e NEO4J_AUTH=neo4j/better_context neo4j:5
-```
+---
 
 ## REST API
 
-Start the API server:
+Start: `uv run uvicorn backend.api.app:app --reload --port 8000`
+Interactive docs: http://localhost:8000/docs
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/graph/stats` | Node/edge counts, types, provenance counts |
+| `GET` | `/api/graph/node/{id}` | Node + attributes + full provenance chain |
+| `GET` | `/api/graph/node/{id}/neighbors` | Graph traversal (`?relation_type=SENT&depth=1`) |
+| `GET` | `/api/graph/nodes` | Paginated node list (`?type=Person&limit=50&offset=0`) |
+| `GET` | `/api/graph/edge/{id}` | Edge + provenance |
+| `GET` | `/api/graph/path` | Shortest path (`?from={id}&to={id}&max_hops=6`) |
+| `POST` | `/api/graph/query` | Pattern DSL: `{"pattern": "(Person)-[SENT]->(Message)", "limit": 50}` |
+| `PUT` | `/api/graph/node/{id}` | Human edit with provenance: `{"attributes": {...}, "editor": "..."}` |
+| `GET` | `/api/source/{source_file}/{record_id}` | Verbatim original record (Layer 4) |
+| `POST` | `/api/query` | 4-tier cascade: `{"query": "...", "context": {...}}` |
+| `GET` | `/api/workflow` | List registered workflows |
+| `POST` | `/api/workflow/{name}` | Invoke workflow: `{"payload": {...}}` |
+| `GET` | `/api/conflicts` | List queued conflicts (`?status=open&limit=50`) |
+| `GET` | `/api/conflicts/{id}` | Get a single conflict with both candidate values |
+| `POST` | `/api/conflicts/{id}/resolve` | Resolve: `{"value": "...", "editor": "..."}` → writes HUMAN provenance |
+
+### Example: trace a fact to its source
 
 ```bash
-uv run uvicorn backend.api.app:app --reload --port 8000
-```
-
-Interactive docs at http://localhost:8000/docs (Swagger UI).
-
-### Endpoints
-
-| Endpoint | Description |
-|----------|-------------|
-| `GET /api/graph/stats` | Node/edge counts, types, provenance/raw counts |
-| `GET /api/graph/node/{id}` | Node + attributes + full provenance chain |
-| `GET /api/graph/node/{id}/neighbors?relation_type=SENT&depth=1` | Traverse the graph |
-| `GET /api/graph/nodes?type=Person&limit=50&offset=0` | List nodes by type (paginated) |
-| `GET /api/graph/edge/{id}` | Edge + provenance |
-| `GET /api/graph/path?from={id}&to={id}&max_hops=6` | Shortest path between nodes |
-| `POST /api/graph/query` | Pattern query: `{"pattern": "(Person)-[SENT]->(Message)"}` |
-| `PUT /api/graph/node/{id}` | Edit node: `{"attributes": {...}, "editor": "name"}` |
-| `GET /api/source/{source_file}/{record_id}` | Original raw JSON record (layer 4) |
-| `POST /api/query` | Retrieval cascade: `{"query": "...", "context": {...}}` -> `QueryResult` (items + citations + tier_used + relevance) |
-| `GET /api/workflow` | List registered workflow names |
-| `POST /api/workflow/{name}` | Invoke a workflow: `{"payload": {...}, "ctx": {...}}` -> `WorkflowResult` |
-| `GET /api/conflicts?status=open` | List queued conflicts (paginated, filterable by `node_id` / `attribute`) |
-| `GET /api/conflicts/{id}` | A single conflict + both candidate sides |
-| `POST /api/conflicts/{id}/resolve` | Apply human resolution: `{"value": ..., "editor": "..."}` -> resolved `Conflict` (writes HUMAN provenance through `edit_node`) |
-
-### Provenance trace (how to map graph data back to source files)
-
-Every node/edge response includes a `provenance[]` array. Each entry contains:
-
-- `source_file` -- which file the fact was ingested from (e.g. `Enterprise_mail_system/emails.json`)
-- `source_record_id` -- which record within that file
-- `source_field` -- which JSONPath field (e.g. `$.sender_email`)
-- `extraction_method` -- `direct_mapping` | `llm_extraction` | `rule_based` | `human`
-- `confidence` -- 0.0 to 1.0
-- `raw_value` -- the original value before transformation
-
-To get the full original record, call `GET /api/source/{source_file}/{source_record_id}`.
-
-### Example: trace a person back to source
-
-```bash
-# 1. Get person node (from Neo4j + SQLite provenance)
+# Get a person node with full provenance
 curl http://localhost:8000/api/graph/node/person:emp_1002
 
-# 2. Get emails this person sent (from Neo4j)
-curl "http://localhost:8000/api/graph/node/person:emp_1002/neighbors?relation_type=SENT&depth=1"
+# Walk their reporting chain
+curl "http://localhost:8000/api/graph/node/person:emp_1002/neighbors?relation_type=REPORTS_TO&depth=2"
 
-# 3. Get the raw source record (from SQLite layer 4)
-curl "http://localhost:8000/api/source/Enterprise_mail_system/emails.json/email:095a317c-8bd5-43d8-8796-490882a0f1bf"
+# Get the raw original record
+curl "http://localhost:8000/api/source/Human_Resource_Management%2FEmployees%2Femployees.json/person:emp_1002"
 ```
 
-### Example: pattern query (Flow 2)
+### Example: subgraph query
 
 ```bash
-# Find all Person->SENT->Message triples (paginated)
+# All communication in the Engineering department
 curl -X POST http://localhost:8000/api/graph/query \
   -H 'Content-Type: application/json' \
-  -d '{"pattern": "(Person)-[SENT]->(Message)", "limit": 5}'
+  -d '{"pattern": "(Person)-[SENT]->(Message)", "limit": 100}'
 
-# Response: { "pattern": "...", "matches": [{source, edge, target}, ...], "total": 11928 }
-
-# Other patterns:
-# (Person)-[REPORTS_TO]->(Person)     -- reporting chains
-# (Organization)-[OWNS]->(Asset)     -- org assets
-# (Person)-[AUTHORED]->(Document)    -- authorship
-```
-
-Supported node types: Person, Organization, Document, Message, Event, Asset, Topic.
-Supported relation types: MEMBER_OF, REPORTS_TO, WORKS_ON, OWNS, AUTHORED, SENT,
-RECEIVED, MENTIONS, PART_OF, PURCHASED, ASSIGNED_TO, TAGGED, RELATED_TO, SAME_AS.
-
-### Example: edit a node (Flow 5)
-
-```bash
-# Add a skill to a person (with human provenance tracking)
-curl -X PUT http://localhost:8000/api/graph/node/person:emp_1002 \
+# Engineering org structure
+curl -X POST http://localhost:8000/api/graph/query \
   -H 'Content-Type: application/json' \
-  -d '{"attributes": {"skills": "Python, ML, Kubernetes"}, "editor": "florian@company.com"}'
-
-# Response includes the updated node with new human provenance:
-# provenance[]: { extraction_method: "human", extraction_model: "human:florian@company.com",
-#                 confidence: 1.0, source_file: "human_edits", ... }
+  -d '{"pattern": "(Person)-[MEMBER_OF]->(Organization)", "limit": 500}'
 ```
 
-## Retrieval pipeline
-
-Two surfaces over the same tier set:
-
-- **`POST /api/query`** -- ad-hoc cascade. Walks tiers fast -> slow,
-  returns the first whose `relevance` clears its `escalate_below`
-  threshold. Order: `[exact, router, hybrid, agentic, stub]`. Router
-  may emit `route_to=<tier>` to skip ahead (honored once per query).
-- **`POST /api/workflow/{name}`** -- frozen-policy recipe. Workflow
-  declares `allowed_tiers: frozenset[str]` at class level; framework
-  wraps the live tier set in a `TierRegistry` locked to that subset.
-  Cuts latency / cost where the shape is known.
-
-Tier algorithms (each documents its own scoring):
-
-| Tier | Algorithm |
-|---|---|
-| `exact` | Cypher id lookup + Neo4j fulltext (BM25-similar, normalized) |
-| `router` | **Fine-tuned 205M GLiNER2 SLM** (Pioneer.ai, multi-task: intent + NER, single forward pass). Round 1 numbers: 91.1 % intent acc, 0.394 macro NER F1, 467 ms p95 — beats GPT-4o (86.7 / 0.337 / 1699 ms). On `lookup` inline-delegates to ExactTier; emits `route_to` for `search` / `analytical` |
-| `hybrid` | Neo4j HNSW vector + fulltext fused by Reciprocal Rank Fusion (k=60) |
-| `agentic` | Bounded Gemini function-calling loop (max 6 calls, 10s wall-clock); 6-tool surface; relevance ∈ {0.7 grounded, 0.3 ungrounded, 0.0 failed} |
-| `stub` | terminal fallback, always 0 hits |
-
-Each backend is hidden behind a `Protocol` (`Embedder`, `EntityRouter`,
-`LLMClient`) with a stub default so CI runs without weights or API
-keys. Production wiring selected via env:
-
-- `QONTEXT_EMBEDDER=bge` -- uses `BAAI/bge-small-en-v1.5`
-  (`sentence-transformers` ships with the project). Without this the
-  vector arm returns nothing -- run the embedding pass first:
-  `uv run python -m backend.retrieval.embed [--limit N]` writes
-  `:Entity.vector` for matched nodes (idempotent, skips
-  already-embedded).
-- `QONTEXT_ROUTER=gliner2` -- uses our fine-tuned 205M GLiNER2 SLM
-  (Round 1 trained on Pioneer; ships local once weights are downloaded
-  to `pioneer/weights/<model-name>/`). Needs `uv add gliner` and
-  `GLINER2_MODEL_PATH` set. See `pioneer/README.md` for the Pioneer.ai
-  workflow and `pioneer/bench/results/comparison.md` for the
-  3-column eval (vs base GLiNER2 vs GPT-4o).
-- `QONTEXT_AGENTIC=gemini` -- uses `gemini-2.5-flash`; needs
-  `GEMINI_API_KEY`. Same setting also routes any workflow that needs
-  an LLM (`thread-summary`, `answer-customer-email`).
-
-Built-in workflows:
-
-| Name | Tiers | Pipeline |
-|---|---|---|
-| `answer-customer-email` | `{exact, hybrid}` | T1 sender lookup -> T1 neighbors (cap 25) -> T3 product search top-5 -> single-shot LLM compose with `tools=[]` |
-| `thread-summary` | `{hybrid}` | T3 cluster recall (per-participant + regex-NER id tokens) -> bounded 3-tool agent loop (`get_node` / `get_neighbors` / `get_source_record`, ≤6 calls) -> structured markdown |
-
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) ("Search API" +
-"Workflow API") for the per-tier deep dive.
-
-### Example: cascade query
+### Example: cascade retrieval
 
 ```bash
 curl -X POST http://localhost:8000/api/query \
   -H 'Content-Type: application/json' \
-  -d '{"query": "emp_1002", "context": {"max_latency_ms": 500}}'
+  -d '{"query": "who leads the engineering team?"}'
 
-# Response:
-# { "answer": null,
-#   "items": [{"kind": "node", "id": "person:emp_1002", "score": 1.0, "preview": "..."}],
-#   "citations": [{"source_file": "...", "source_record_id": "...", ...}],
-#   "tier_used": "exact",
-#   "relevance": 1.0,
-#   "latency_ms": 12 }
+# Response includes: answer, items[], citations[], tier_used, relevance, latency_ms
 ```
 
-### Example: invoke a workflow
+---
+
+## Retrieval pipeline
+
+```
+Query
+  │
+  ├─ ExactTier      Cypher id lookup + Neo4j BM25 fulltext
+  │                 → relevance 1.0 if id hit; normalized BM25 score otherwise
+  │
+  ├─ RouterTier     Fine-tuned 205M GLiNER2 SLM (Pioneer.ai)
+  │                 4-way intent: lookup / search / analytical / unknown
+  │                 6-type NER: person / org / date / ticket_id / product / location
+  │                 → inline-delegates lookup to ExactTier; emits route_to for others
+  │
+  ├─ HybridTier     Neo4j HNSW vector + fulltext fused by RRF (k=60)
+  │                 → relevance = cosine similarity after RRF
+  │
+  ├─ AgenticTier    Bounded Gemini function-calling loop
+  │                 6 tools: pattern_query / fulltext_search / vector_search /
+  │                          get_node / get_neighbors / get_source_record
+  │                 Max 6 calls, 10s wall-clock
+  │
+  └─ StubTier       Terminal fallback (always 0 hits)
+```
+
+Each tier is a `Protocol`-backed class with a stub default so CI runs without weights or API keys.
+
+---
+
+## Ingest pipeline
+
+```
+1. ONBOARD (one-time per source)
+   Sample N records → Gemini Flash 2.5 drafts MappingSpec YAML
+   → 3-round pydantic validation + self-repair → persist to SQLite (status='draft')
+   → Human reviews + promotes: uv run python -m backend.ingest.manage promote <spec_id>
+
+2. RUN (deterministic, idempotent)
+   For each record:
+     Idempotency check: skip if (spec_version, file, record_id, content_hash) seen
+     add_source_record() → verbatim raw in SQLite
+     apply NodeRules → MERGE :Entity on id_template
+     apply EdgeRules → MERGE relationship on sha256(src|rel|tgt)
+     run LLMExtraction blocks (opt-in, cached, capped)
+   → ledger: records_in / records_out / records_dead
+
+3. IDENTITY RESOLVE (post-pass)
+   Cluster Person nodes by normalized email
+   → emit SAME_AS edges (no merge, preserves per-source provenance)
+
+4. EMBED (manual one-shot)
+   uv run python -m backend.retrieval.embed
+   → writes :Entity.vector for HNSW vector search
+```
+
+To run specific sources: `uv run bash scripts/ingest_all.sh emails employees`
+
+---
+
+## Running tests
 
 ```bash
-# Discovery
-curl http://localhost:8000/api/workflow
-# { "workflows": ["answer-customer-email", "thread-summary"] }
-
-# Draft a customer-email reply
-curl -X POST http://localhost:8000/api/workflow/answer-customer-email \
-  -H 'Content-Type: application/json' \
-  -d '{"payload": {"from_address": "alice@acme.com",
-                    "subject": "Order #1234 status",
-                    "body": "Hi, where is my order?"}}'
-
-# Response: WorkflowResult (QueryResult shape +
-#   workflow="answer-customer-email" + extras={from_address,
-#   sender_node_id, related_count, product_candidate_count})
+uv run pytest                          # all 331 tests
+uv run pytest backend/tests/test_ingest_agnostic.py  # vendor-agnostic ingest proof
+uv run pytest backend/tests/test_retrieval.py         # per-tier retrieval
+uv run pytest backend/tests/test_api_integration.py   # full API roundtrip
 ```
 
-### Eval harness
-
+TypeScript:
 ```bash
-uv run python -m backend.eval.harness --limit 50
-# Writes backend/eval/reports/<UTC-timestamp>.md with recall@5/@10,
-# p50/p95 latency, per-tier termination, escalation rate.
+cd frontend && npx tsc --noEmit        # zero errors
 ```
 
-## Adaptive ingestion — company-data agnostic
+---
 
-> **Yes, this is the central claim of the project.** The graph-building
-> logic does not know or care what vendor a record came from. Drop in any
-> CRM/HR/ITSM/comms source you can read as JSON / JSONL / NDJSON / CSV;
-> the LLM drafts a `MappingSpec` once at onboarding; a deterministic
-> ingester runs it forever after. Same code, same canonical graph types
-> out, regardless of the input schema.
+## What's not built yet
 
-### Proof: four real-world CRM shapes through one Ingestor
+| Feature | Notes |
+|---------|-------|
+| Cross-encoder rerank | Sharpens top-k ordering after RRF fusion. One model call post-HybridTier. |
+| Conflict resolution UI (inbox) | Engine + REST are done. Visual queue + accept/pick/merge actions — one new frontend page over `/api/conflicts`. |
+| MCP server | Thin wrappers around existing API for Claude / AI agents. |
 
-`backend/test_ingest_agnostic.py` runs four deliberately-different vendor
-payload shapes through the **same** `Ingestor` instance and asserts they
-collapse to identical canonical `Person` nodes:
+---
 
-| Vendor flavor | Email lives at | Sample payload quirk |
-|---|---|---|
-| HubSpot-like | `$.properties.email` | nested `properties` envelope, `associations` arrays, ISO `Z` dates |
-| Salesforce-like | `$.Email` | per-record `attributes` envelope, `IsDeleted` soft-delete flag |
-| Dynamics 365 OData-like | `$.emailaddress1` | `@odata.etag` keys, `_lookup_field_value` references, `statecode` filter |
-| Pipedrive-like | `$.primary_email[*].value` | array of email objects, `org_id.name` nested |
+## Key design decisions
 
-```bash
-$ uv run pytest backend/test_ingest_agnostic.py -v
-test_each_vendor_produces_canonical_person_nodes[hubspot]    PASSED
-test_each_vendor_produces_canonical_person_nodes[salesforce] PASSED
-test_each_vendor_produces_canonical_person_nodes[dynamics]   PASSED
-test_each_vendor_produces_canonical_person_nodes[pipedrive]  PASSED
-test_one_ingestor_handles_all_four_vendors                   PASSED
-test_filter_predicate_excludes_deleted_records               PASSED
-6 passed
-```
-
-After ingest, every node carries a `Provenance` row pointing back to the
-**original vendor-specific** field path (`$.properties.email`, `$.Email`,
-`$.emailaddress1`, `$.primary_email[*].value`), so downstream queries can
-answer "where did this fact come from?" without knowing which CRM was
-involved.
-
-### Where vendor heterogeneity is absorbed
-
-All in the spec — **never in code**:
-
-| Vendor difference | Where it's absorbed |
-|---|---|
-| Different field names (`sender_emp_id` vs `from_id` vs `from.user.id`) | `FieldMap.source` JSONPath |
-| Same field, different format (ISO date vs `15/01/2025` vs epoch int) | `FieldMap.transform` chain (`parse_iso_datetime`, `normalize_email`, …) |
-| Field optional in some sources | coalesce list: `source: [$.dob, $.date_of_birth, $.birthDate]` |
-| "Staff" / "Employee" / "TeamMember" all = same concept | `canonical_aliases: { Staff: Person, Employee: Person }` |
-| Soft-deleted / archived records | `when: { equals: ['$.IsDeleted', false] }` |
-| Free-text fields needing LLM extraction (email body → mentions) | `llm_blocks` (opt-in, cached, grounded) |
-| Vendor changes export format | `required_paths_hash` + `type_fingerprint` → hard abort, no silent re-inference |
-| Same person across sources | `IdentityResolver` post-pass → `SAME_AS` edges, provenance preserved |
-
-### Honest scope: what works and what would need a thin shim
-
-**Works out of the box** (`Ingestor` reads natively):
-- JSON arrays, JSONL, NDJSON, CSV (covers ~all CRM exports and ~all REST
-  APIs once you save the response to disk).
-- Arbitrarily nested objects via JSONPath.
-- Array-of-objects fields via `[*]` wildcards.
-
-**Needs a small shim** (~10 lines each):
-- Live API ingestion (Salesforce REST, HubSpot API, Pipedrive API, etc.)
-  — call the API, dump the response to JSON, run `Ingestor`. The spec
-  doesn't care whether records came from a file or an HTTP body.
-- Excel `.xlsx` — convert to CSV with `pandas.read_excel(...).to_csv(...)`,
-  or extend `_iter_records` in `ingestor.py` (~5 lines).
-- XML / SOAP — convert to JSON with `xmltodict`, then ingest as JSON.
-- SQL dumps — export to CSV per table.
-
-**Out of scope today**: live streaming, binary attachments (PDFs, images),
-schema discovery from a database catalog. Adding them is a localized
-change to `_iter_records` — the rest of the pipeline is format-blind.
-
-### CLI
-
-```bash
-# 1. Onboard a brand-new source. Gemini drafts a draft MappingSpec.
-uv run python -m backend.ingest onboard dataset/EnterpriseBench/Enterprise_mail_system/emails.json \
-  --tenant enterprisebench
-
-# Review the drafted YAML at ingest_specs/enterprisebench/emails.yaml,
-# edit as needed.
-
-# 2. Promote the spec to active.
-uv run python -m backend.ingest promote \
-  --tenant enterprisebench \
-  --source-pattern Enterprise_mail_system/emails.json \
-  --version 1
-
-# 3. Dry-run to validate before touching Neo4j.
-uv run python -m backend.ingest dryrun \
-  ingest_specs/enterprisebench/emails.yaml \
-  dataset/EnterpriseBench/Enterprise_mail_system/emails.json --limit 100
-
-# 4. Real ingest (requires running Neo4j).
-uv run python -m backend.ingest run \
-  ingest_specs/enterprisebench/emails.yaml \
-  dataset/EnterpriseBench/Enterprise_mail_system/emails.json --limit 100
-
-# 5. Resolve identity across sources.
-uv run python -m backend.ingest resolve-identity
-```
-
-Re-running `run` on the same source is idempotent: matching
-`(spec_version, source_file, source_record_id, content_hash)` are skipped.
-Renaming a source field aborts the run via drift detection — no silent
-re-inference.
-
-### Bulk ingest — `scripts/ingest_all.sh`
-
-For onboarding the full EnterpriseBench dataset (14 sources) end-to-end in
-one shot, use the bulk script. Idempotent at every layer: onboard skips
-when a YAML already exists, promote is a no-op when already active, and
-record-level dedup means re-runs only ingest new rows.
-
-```bash
-# All 14 sources, then identity resolution.
-bash scripts/ingest_all.sh
-
-# Just one or two by spec-stem name.
-bash scripts/ingest_all.sh emails posts
-
-# Force re-onboard (re-draft the YAML even if it exists).
-FORCE_ONBOARD=1 bash scripts/ingest_all.sh employees
-```
-
-The script post-processes each Gemini-drafted YAML (`normalize_spec_yaml`):
-overwrites `source.file_pattern` with the canonical relative path so the
-subsequent `promote --source-pattern` always matches, and clears
-`required_paths_hash` + `type_fingerprint` so the runtime drift check
-skips on the first ever onboarding (nothing to drift FROM yet).
-
-The onboarder itself (`backend/ingest/onboard.py`) ships with three
-hardenings against Gemini's response_schema quirks:
-
-- **Few-shot reference**: the hand-written `ingest_specs/enterprisebench/emails.yaml`
-  is injected into the draft prompt as a working example. Gemini imitates
-  its structure (especially `@<NodeRule.name>` edge refs and bracket-quoted
-  JSONPath for keys with spaces).
-- **3-round repair loop**: validation failures feed the pydantic error
-  back to Gemini up to 3 times before giving up.
-- **Boundary normalization** (`Onboarder._normalize_llm_output`): strips
-  `when: {}` (Gemini emits empty dicts to mean "no predicate"), forces
-  `required: false` on every FieldMap (the LLM over-marks everything
-  required; the ID is enforced separately via `id_required_fields`),
-  rewrites bare attribute names in `id_required_fields` to JSONPaths via
-  the per-node attribute-to-source map, and bracket-quotes JSONPath
-  segments containing non-identifier characters (`$.Marital Status` →
-  `$['Marital Status']`).
-
-### Programmatic use
-
-```python
-from backend.graph.store import GraphStore
-from backend.ingest.ingest_store import IngestStore
-from backend.ingest.ingestor import Ingestor
-from backend.ingest.spec import MappingSpec
-
-spec = MappingSpec.from_yaml(open("ingest_specs/enterprisebench/emails.yaml").read())
-
-with GraphStore("data/better_context.sqlite") as store:
-    ingest_store = IngestStore(store._conn)
-    ing = Ingestor(store, ingest_store)
-    report = ing.run(spec, "dataset/EnterpriseBench/Enterprise_mail_system/emails.json",
-                     limit=100)
-    print(report)
-    # records_in=100 records_out=100 records_skipped=0 records_dead=0 ...
-```
-
-## Canonical type registry
-
-`backend/ingest/canonical.yaml` is the soft schema that anchors every
-vendor's data:
-
-| Node types | Relation types |
-|---|---|
-| Person, Organization, Document, Message, Event, Asset, Topic | MEMBER_OF, REPORTS_TO, WORKS_ON, OWNS, AUTHORED, SENT, RECEIVED, MENTIONS, PART_OF, PURCHASED, ASSIGNED_TO, TAGGED, RELATED_TO, SAME_AS |
-
-Adding a new type is a one-line YAML edit, not a code change. Specs that
-reference types outside this set fail validation at load.
-
-## LLM usage policy
-
-The LLM is **not** in the per-record hot path for structured data. Three
-bounded uses only:
-
-1. **Onboarding** — Gemini drafts a `MappingSpec` once per source.
-2. **Opt-in extraction** — `llm_blocks` declared inside a spec. Cached,
-   confidence-floored, grounded against the source span (rejects
-   hallucinations), capped per-record.
-3. **One-shot self-repair** — if the drafted spec fails pydantic
-   validation, the validator error is sent back ONCE for repair.
-
-Missing required field → `dead_letter`. Schema drift → `DriftError`. Type
-coercion → registered transformer. Never the LLM.
-
-## Layout (backend)
-
-```
-pyproject.toml          uv project: deps, dev tools, build config
-.python-version         pinned Python (3.12)
-uv.lock                 deterministic dep lock
-backend/
-├── config.py           load_dotenv + env constants
-├── models/graph.py     GraphNode, GraphEdge, Provenance, SourceRecord
-├── graph/
-│   ├── schema.sql      raw + provenance + ingestion-control-plane tables
-│   └── store.py        GraphStore (Neo4j + SQLite, MERGE-based)
-├── api/
-│   ├── models.py       Pydantic v2 response models (OpenAPI source of truth)
-│   └── app.py          FastAPI app: graph + pattern query + edit + source-record + /api/query + /api/workflow endpoints
-├── test_ingest_agnostic.py  cross-vendor agnosticism proof (4 shapes, 1 Ingestor)
-├── test_graph_query_edit.py pattern query DSL + edit API tests
-├── retrieval/
-│   ├── models.py       Pydantic v2 Citation / Hit / QueryContext / QueryResult
-│   ├── tiers.py        Tier ABC + StubTier (terminal fallback)
-│   ├── exact.py        ExactTier (R1) — Cypher id lookup + Lucene fulltext
-│   ├── hybrid.py       HybridTier (R2) — vector + fulltext fused by RRF
-│   ├── router.py       RouterTier (R4) — GLiNER2 intent + NER (StubEntityRouter default)
-│   ├── agentic.py      AgenticTier (R3) + LLMClient Protocol (Noop / Stub / Gemini)
-│   ├── tools.py        6-tool surface for AgenticTier (pattern_query, fulltext_search, vector_search, get_node, get_neighbors, get_source_record)
-│   ├── embedder.py     Embedder Protocol + StubEmbedder + BgeSmallEmbedder
-│   ├── embed.py        one-shot manual pass to populate :Entity.vector
-│   ├── index.py        Neo4j HNSW + fulltext index DDL
-│   ├── orchestrator.py CascadeOrchestrator + TierConfig + factory builders
-│   ├── engine.py       ContextEngine — public façade over the cascade
-│   ├── _util.py        shared preview / lucene-escape / citation helpers
-│   └── workflows/
-│       ├── base.py        Workflow ABC + WorkflowInput/Result + TierRegistry
-│       ├── registry.py    register_workflow / build_workflow / register_builtin_workflows
-│       ├── customer_email.py  answer-customer-email (R5b)
-│       └── thread_summary.py  thread-summary (R5c)
-├── eval/
-│   ├── golden.py       loads (query, expected_node_ids) from tasks.jsonl
-│   ├── harness.py      runs cascade, writes Markdown report
-│   └── reports/        timestamped runs (gitignored)
-└── ingest/
-    ├── canonical.yaml  canonical type registry (data, not code)
-    ├── spec.py         pydantic MappingSpec + canonical-registry loader
-    ├── runtime.py      JSONPath + transformers + predicates + drift detection
-    ├── store.py        SQLite CRUD: mapping_specs, llm_cache, runs, dead_letter
-    ├── llm.py          GeminiClient + JSON-Schema sanitizer + SQLite cache
-    ├── onboard.py      Onboarder.draft_spec() — LLM-drafted MappingSpec
-    ├── ingestor.py     Ingestor.run() — deterministic record→graph
-    ├── identity.py     IdentityResolver (deterministic email match)
-    └── __main__.py     CLI: dryrun / run / onboard / promote / resolve-identity
-```
+- **No per-vendor parsers.** MappingSpec + one Ingestor handles all 14 sources. Adding a new data source = adding one YAML file.
+- **Provenance is non-optional.** Every attribute in the graph has a `Provenance` record linking it back to exact source file + field + original value. Human edits get the same treatment.
+- **Small model beats large model.** The fine-tuned 205M GLiNER2 SLM outperforms GPT-4o on the routing task at 1/3600th the per-query cost and 3.6× faster.
+- **VFS is a lens, not storage.** The virtual file system is derived at query time from `(canonical_type, node_id)`. No materialization, no sync. Adding a new node type to `canonical.yaml` auto-surfaces it.
+- **Subgraph as first-class concept.** Department/Location are explicit `Organization` nodes connected by `MEMBER_OF` edges — not just flat properties. The filter panel builds subgraph views by traversing these edges.
