@@ -11,6 +11,7 @@ from backend.api.app import (
     _build_default_engine,
     app,
     get_context_engine,
+    get_llm,
     get_store,
 )
 from backend.graph.store import GraphStore
@@ -89,6 +90,7 @@ class TestWorkflowEndpoint:
     def _client(self) -> TestClient:
         app.dependency_overrides[get_store] = lambda: MagicMock(spec=GraphStore)
         app.dependency_overrides[get_context_engine] = _engine_with_fixed_tier
+        app.dependency_overrides[get_llm] = lambda: MagicMock()
         return TestClient(app)
 
     def teardown_method(self) -> None:
@@ -127,6 +129,7 @@ class TestWorkflowEndpoint:
         # cannot be built. This exercises the 500 path.
         app.dependency_overrides[get_store] = lambda: MagicMock(spec=GraphStore)
         app.dependency_overrides[get_context_engine] = _build_default_engine
+        app.dependency_overrides[get_llm] = lambda: MagicMock()
         client = TestClient(app)
         resp = client.post("/api/workflow/api-test", json={"payload": {"q": "x"}})
         assert resp.status_code == 500

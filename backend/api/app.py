@@ -104,6 +104,21 @@ def _build_engine_with_store(store: GraphStore) -> ContextEngine:
     return ContextEngine(build_orchestrator_with_store(store))
 
 
+def _build_llm_from_env() -> object:
+    """Mirror the QONTEXT_AGENTIC selection in build_orchestrator_with_store
+    so workflows that need an LLM (thread-summary, customer-email) get the
+    same backend the cascade uses.
+    """
+    from backend.retrieval.agentic import GeminiLLMClient, NoopLLMClient
+
+    kind = os.environ.get("QONTEXT_AGENTIC", "noop").lower()
+    if kind == "gemini":
+        return GeminiLLMClient()
+    if kind == "noop":
+        return NoopLLMClient(text="workflow LLM not configured (set QONTEXT_AGENTIC=gemini)")
+    raise ValueError(f"QONTEXT_AGENTIC must be 'gemini' or 'noop', got {kind!r}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     db_path = os.environ.get("SQLITE_DB", "data/better_context.sqlite")
@@ -119,6 +134,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # effect registration in `workflows/__init__.py`.
     register_builtin_workflows()
     app.state.store = store
+    app.state.llm = _build_llm_from_env()
     app.state.context_engine = _build_engine_with_store(store)
     yield
     store.close()
@@ -146,6 +162,10 @@ def get_store(request: Request) -> GraphStore:
 
 def get_context_engine(request: Request) -> ContextEngine:
     return request.app.state.context_engine  # type: ignore[no-any-return]
+
+
+def get_llm(request: Request) -> object:
+    return request.app.state.llm  # type: ignore[no-any-return]
 
 
 # ---------- Retrieval API ----------
@@ -178,6 +198,8 @@ async def run_workflow(
     name: str,
     body: WorkflowInput,
     engine: ContextEngine = Depends(get_context_engine),
+    store: GraphStore = Depends(get_store),
+    llm: object = Depends(get_llm),
 ) -> WorkflowResult:
     """Invoke a registered workflow by name.
 
@@ -188,7 +210,7 @@ async def run_workflow(
     * 200 — `WorkflowResult` JSON.
     """
     try:
-        wf = build_workflow(name, engine.tiers_by_name)
+        wf = build_workflow(name, engine.tiers_by_name, llm=llm, store=store)
     except KeyError as e:
         raise HTTPException(404, str(e)) from e
     except ValueError as e:

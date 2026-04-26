@@ -137,12 +137,16 @@ def build_workflow(
     `extras` are forwarded as keyword arguments to the workflow
     subclass's constructor — non-trivial workflows (e.g. compose-with-
     LLM ones) need additional dependencies that the framework knows
-    nothing about (an `LLMClient`, a `GraphStore`). The framework
-    contract here is intentionally narrow: pass anything that's not
-    `tiers` as a kwarg, and the subclass is responsible for declaring
-    and validating it. A subclass that does not accept an `extras` kw
-    raises `TypeError` at construction — fail-fast, no silent drop.
+    nothing about (an `LLMClient`, a `GraphStore`). The framework filters
+    extras to those declared by the subclass's `__init__` so deployments
+    can hand the framework "everything available" without forcing every
+    workflow to accept every dependency. Missing required kwargs still
+    raise `TypeError` at construction — fail-fast, no silent drop.
     """
+    import inspect
+
     cls = get_workflow(name)
     registry = TierRegistry(tiers_by_name, cls.allowed_tiers)
-    return cls(registry, **extras)
+    accepted = set(inspect.signature(cls.__init__).parameters)
+    filtered = {k: v for k, v in extras.items() if k in accepted}
+    return cls(registry, **filtered)

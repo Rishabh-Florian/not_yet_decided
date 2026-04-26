@@ -27,6 +27,7 @@ import os
 import sys
 from typing import Any
 
+import backend.config  # loads .env so NEO4J_* + GEMINI_API_KEY land in os.environ  # noqa: F401
 from backend.graph.store import GraphStore
 
 from .embedder import BgeSmallEmbedder, Embedder, StubEmbedder
