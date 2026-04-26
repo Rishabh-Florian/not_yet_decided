@@ -2,12 +2,13 @@
 import { useState, useRef, useCallback } from "react";
 import TopBar from "@/components/shell/TopBar";
 import VfsTree from "@/components/shell/VfsTree";
+import LeftFilterPanelMount from "@/components/shell/LeftFilterPanelMount";
 import ProvenancePanel from "@/components/shell/ProvenancePanel";
 import { Suspense } from "react";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [leftW, setLeftW] = useState(220);
-  const [rightW, setRightW] = useState(280);
+  const [rightW, setRightW] = useState(260);
   const dragging = useRef<null | "left" | "right">(null);
   const startX = useRef(0);
   const startW = useRef(0);
@@ -48,6 +49,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <Suspense>
             <VfsTree />
           </Suspense>
+          <LeftFilterPanelMount />
         </div>
 
         {/* Left resize handle */}
