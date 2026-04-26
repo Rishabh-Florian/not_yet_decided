@@ -27,6 +27,12 @@ from backend.retrieval import (
     TierConfig,
     build_orchestrator_with_store,
 )
+from backend.retrieval.workflows import (
+    WorkflowInput,
+    WorkflowResult,
+    build_workflow,
+    list_workflows,
+)
 
 from .models import (
     EdgeResponse,
@@ -150,6 +156,43 @@ async def query(
     try:
         return engine.query(body.query, body.context)
     except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+
+
+# ---------- Workflow API ----------
+
+
+@app.get("/api/workflow")
+async def list_workflows_endpoint() -> dict[str, list[str]]:
+    """Discovery endpoint — names of every registered workflow."""
+    return {"workflows": list_workflows()}
+
+
+@app.post("/api/workflow/{name}", response_model=WorkflowResult)
+async def run_workflow(
+    name: str,
+    body: WorkflowInput,
+    engine: ContextEngine = Depends(get_context_engine),
+) -> WorkflowResult:
+    """Invoke a registered workflow by name.
+
+    * 404 — workflow `name` is not registered.
+    * 422 — `body` is not a valid `WorkflowInput` (handled by FastAPI).
+    * 400 — workflow's `run()` raised on its payload validation
+      (`ValueError` / `TypeError`).
+    * 200 — `WorkflowResult` JSON.
+    """
+    try:
+        wf = build_workflow(name, engine.tiers_by_name)
+    except KeyError as e:
+        raise HTTPException(404, str(e)) from e
+    except ValueError as e:
+        # Engine missing a tier the workflow requires — a deployment bug,
+        # not a client bug; surface it as 500 so it's noticed.
+        raise HTTPException(500, str(e)) from e
+    try:
+        return wf.run(body)
+    except (ValueError, TypeError) as e:
         raise HTTPException(400, str(e)) from e
 
 

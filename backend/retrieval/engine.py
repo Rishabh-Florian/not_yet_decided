@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from .models import QueryContext, QueryResult
 from .orchestrator import CascadeOrchestrator
+from .tiers import Tier
 
 
 class ContextEngine:
@@ -30,3 +31,11 @@ class ContextEngine:
     def tier_names(self) -> list[str]:
         """Tier names in cascade order — useful for logging and the eval harness."""
         return self._orchestrator.tier_names
+
+    @property
+    def tiers_by_name(self) -> dict[str, Tier]:
+        """Live tier set keyed by name. Surfaced for the workflow framework
+        (which needs to wire a locked-subset `TierRegistry`) — cascade
+        callers do not need this.
+        """
+        return self._orchestrator.tiers_by_name

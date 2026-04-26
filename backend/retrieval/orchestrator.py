@@ -95,6 +95,16 @@ class CascadeOrchestrator:
         """Tiers in cascade order."""
         return list(self._order)
 
+    @property
+    def tiers_by_name(self) -> dict[str, Tier]:
+        """Snapshot of registered tiers keyed by `tier.name`.
+
+        Returned dict is a fresh copy — mutating it does not change the
+        orchestrator's internal state. Used by the workflow framework
+        to build per-workflow `TierRegistry` views over a locked subset.
+        """
+        return {t.name: t for t in self._tiers}
+
     def run(self, query: str, ctx: QueryContext) -> QueryResult:
         if not query:
             raise ValueError("query must be a non-empty string")

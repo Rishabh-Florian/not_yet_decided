@@ -71,4 +71,13 @@
 - Human-backlog: GEMINI_API_KEY + QONTEXT_AGENTIC=gemini setup checklist.
 - All 4 tiers + 1 stub now wired. Next: #7 (R5a Workflow framework).
 
+### 2026-04-26 — #7 done (R5a Workflow framework)
+- backend/retrieval/workflows/: base.py (Workflow ABC, WorkflowInput, WorkflowResult, TierRegistry), registry.py (register_workflow decorator, get_workflow, build_workflow).
+- Frozen-policy enforcement (two-layer): (1) Workflow.allowed_tiers: ClassVar[frozenset[str]] at type level; (2) TierRegistry snapshot built from dict[str, Tier] — workflow body has no handle on wider tier set; __init__ asserts tiers.allowed == cls.allowed_tiers.
+- API: POST /api/workflow/{name} (404 unknown, 422 invalid body, 400 ValueError/TypeError, 500 missing tier); GET /api/workflow discovery.
+- backend/retrieval/orchestrator.py + engine.py: tiers_by_name property added.
+- Verifiers: ruff clean, pyright 0 errors, pytest 269 passed / 16 skipped.
+- ARCHITECTURE.md doc deferred to #8 (first concrete workflow lands there).
+- Next: #8 (R5b answer-customer-email workflow).
+
 ---
