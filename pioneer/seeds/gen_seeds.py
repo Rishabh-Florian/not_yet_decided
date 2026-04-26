@@ -4,7 +4,7 @@ Pioneer.ai GLiNER2 fine-tune from EnterpriseBench tasks.
 This is a one-shot derivation script. Re-run after the entity-type
 schema changes in `backend/retrieval/router.py::ENTITY_TYPES`.
 
-Output goes to `backend/retrieval/router_train/{seed_examples,eval_set}.jsonl`.
+Output goes to `pioneer/seeds/{seed_examples,eval_set}.jsonl`.
 
 Format (one JSON object per line):
 
@@ -29,9 +29,9 @@ import re
 from collections import Counter
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent.parent
 TASKS = ROOT / "dataset" / "EnterpriseBench" / "tasks.jsonl"
-OUT_DIR = ROOT / "backend" / "retrieval" / "router_train"
+OUT_DIR = ROOT / "pioneer" / "seeds"
 
 PAT_EMP = re.compile(r"\bemp_\d+\b")
 PAT_CLNT = re.compile(r"\b(?:CLNT|CUST|VEND|ORG)-\d+\b")
@@ -173,17 +173,20 @@ def harvest_lookup_examples(limit: int) -> list[dict[str, object]]:
 def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     rng = random.Random(42)
-    lookups = harvest_lookup_examples(limit=70)
+    # Pull more lookup seeds: 150 train + 30 eval. tasks.jsonl has 483
+    # entries, so we have headroom; richer training data => better
+    # synthetic expansion downstream on Pioneer.
+    lookups = harvest_lookup_examples(limit=200)
 
     seed = (
-        lookups[:30]
+        lookups[:150]
         + SEARCH_EXAMPLES[:8]
         + ANALYTICAL_EXAMPLES[:8]
         + AMBIGUOUS_EXAMPLES[:4]
     )
     rng.shuffle(seed)
     eval_set = (
-        lookups[30:60]
+        lookups[150:180]
         + SEARCH_EXAMPLES[8:]
         + ANALYTICAL_EXAMPLES[8:]
         + AMBIGUOUS_EXAMPLES[4:]

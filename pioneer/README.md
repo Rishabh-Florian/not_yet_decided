@@ -47,7 +47,7 @@ uv run python scripts/gen_router_seed.py
 
 4. **Upload `seed_examples.jsonl` as the seed/example data.**
    Path on this machine:
-   `backend/retrieval/router_train/seed_examples.jsonl`.
+   `pioneer/seeds/seed_examples.jsonl`.
    Pioneer expects one JSON object per line:
    `{"query": "...", "intent": "...", "entities": {"<type>": ["<span>", ...]}}`.
 
@@ -69,7 +69,7 @@ uv run python scripts/gen_router_seed.py
    runtime: 15–45 minutes on Pioneer's infra.
 
 7. **Evaluate against `eval_set.jsonl`.**
-   Upload `backend/retrieval/router_train/eval_set.jsonl` as the
+   Upload `pioneer/seeds/eval_set.jsonl` as the
    eval split. Targets:
    - **Intent accuracy ≥ 0.90** on the held-out 45 items.
    - **NER F1 ≥ 0.85** macro-averaged across the 6 entity types
@@ -83,7 +83,7 @@ uv run python scripts/gen_router_seed.py
 8. **Download the fine-tuned weights.**
    Pioneer exposes them as a downloadable model directory (or HF Hub
    repo). Save under
-   `backend/retrieval/router_train/weights/<model-name>/` on the
+   `pioneer/weights/<model-name>/` on the
    machine that will run the cascade. The directory should contain
    the standard GLiNER2 layout (`config.json`, `tokenizer.json`,
    `model.safetensors`, etc.).
@@ -92,7 +92,7 @@ uv run python scripts/gen_router_seed.py
    Set in your shell / `.env`:
    ```sh
    QONTEXT_ROUTER=gliner2
-   GLINER2_MODEL_PATH="C:/.../backend/retrieval/router_train/weights/<model-name>"
+   GLINER2_MODEL_PATH="C:/.../pioneer/weights/<model-name>"
    ```
    `build_orchestrator_with_store` reads `QONTEXT_ROUTER`. With it
    set to `gliner2`, the cascade boots `GLiNER2EntityRouter` instead

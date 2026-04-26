@@ -50,7 +50,7 @@ backend. `StubEntityRouter` is a deterministic fallback that classifies
 purely from id-shaped tokens — it is correct enough to keep the cascade
 green in CI and on machines that have not run the Pioneer.ai
 fine-tune. Replace with `GLiNER2EntityRouter` once `GLINER2_MODEL_PATH`
-points at the fine-tuned weights (see `router_train/README.md`).
+points at the fine-tuned weights (see `pioneer/README.md`).
 
 Deep module: `RouterTier.search()` is the only public method.
 Classifier construction, NER token extraction, and ExactTier delegation
@@ -69,12 +69,12 @@ from .tiers import Tier
 
 # The four routing intents emitted by the classifier. Keep tightly
 # coupled to the Pioneer.ai fine-tuning label set in
-# `router_train/prompt.md`; if you add a label, update both places.
+# `pioneer/prompt.md`; if you add a label, update both places.
 RouterIntent = Literal["lookup", "search", "analytical", "ambiguous"]
 INTENTS: tuple[RouterIntent, ...] = ("lookup", "search", "analytical", "ambiguous")
 
 # Canonical NER entity types. Mirrors the schema in
-# `router_train/prompt.md` and the GLiNER2 multi-task config used at
+# `pioneer/prompt.md` and the GLiNER2 multi-task config used at
 # fine-tune time. Any change here requires re-training.
 ENTITY_TYPES: tuple[str, ...] = (
     "emp_id",
@@ -95,7 +95,7 @@ _ID_BEARING_TYPES: frozenset[str] = frozenset({"emp_id", "customer_id", "ticket_
 # of the classifier's claimed label — a noisy/uncertain output is
 # treated as `ambiguous`. The default 0.5 is a safe placeholder; tune
 # after Pioneer.ai eval lands real calibration numbers (see
-# `router_train/README.md` § Calibration).
+# `pioneer/README.md` § Calibration).
 _DEFAULT_MIN_INTENT_CONF: float = 0.5
 
 # Heuristic id patterns the stub router uses to classify a query as
@@ -263,7 +263,7 @@ class GLiNER2EntityRouter:
     fine-tune. The constructor imports it lazily and raises a clear
     `ImportError` with installation instructions if absent.
 
-    See `backend/retrieval/router_train/README.md` for the end-to-end
+    See `backend/retrieval/pioneer/README.md` for the end-to-end
     Pioneer.ai workflow.
     """
 
@@ -287,7 +287,7 @@ class GLiNER2EntityRouter:
                 "GLiNER2EntityRouter requires either a local weights path "
                 f"({self.MODEL_PATH_ENV}=...) or a Pioneer.ai model id "
                 f"({self.MODEL_ID_ENV}=...). See "
-                "backend/retrieval/router_train/README.md for fine-tuning "
+                "backend/retrieval/pioneer/README.md for fine-tuning "
                 "instructions. Use StubEntityRouter for tests / no-model "
                 "fallback."
             )
@@ -298,7 +298,7 @@ class GLiNER2EntityRouter:
                 "GLiNER2EntityRouter requires the `gliner` package. "
                 "Install with `uv add gliner` after running the "
                 "Pioneer.ai fine-tune (see "
-                "backend/retrieval/router_train/README.md)."
+                "backend/retrieval/pioneer/README.md)."
             ) from e
         self._model_path = path
         self._endpoint = endpoint
@@ -327,7 +327,7 @@ class GLiNER2EntityRouter:
             raise ValueError("query must be non-empty / non-whitespace")
         model = self._ensure_model()
         # GLiNER2 multi-task forward pass. Schema matches
-        # `router_train/prompt.md`. The fine-tuned head returns
+        # `pioneer/prompt.md`. The fine-tuned head returns
         # ``{"classifications": {"intent": [{"label": ..., "score": ...}, ...]},
         #    "entities": [{"label": "emp_id", "text": "emp_1002", "score": ...}, ...]}``.
         raw = model.predict(  # type: ignore[attr-defined]
@@ -343,7 +343,7 @@ def _parse_gliner2_output(raw: object) -> RouterDecision:
 
     Pulled out of `GLiNER2EntityRouter.classify` so it can be unit-tested
     without the model. The expected raw shape is documented in the
-    `router_train/README.md` § Output format.
+    `pioneer/README.md` § Output format.
     """
     if not isinstance(raw, dict):
         raise RuntimeError(f"GLiNER2 returned non-dict result: {type(raw).__name__}")

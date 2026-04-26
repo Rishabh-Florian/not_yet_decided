@@ -254,7 +254,7 @@ keys. Production wiring selected via env:
   already-embedded).
 - `QONTEXT_ROUTER=gliner2` -- uses fine-tuned GLiNER2; needs
   `uv add gliner` and weights at `GLINER2_MODEL_PATH` (see
-  `backend/retrieval/router_train/README.md` for the Pioneer.ai
+  `pioneer/README.md` for the Pioneer.ai
   fine-tune flow).
 - `QONTEXT_AGENTIC=gemini` -- uses `gemini-2.5-flash`; needs
   `GEMINI_API_KEY`. Same setting also routes any workflow that needs

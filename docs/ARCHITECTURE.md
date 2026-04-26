@@ -1249,7 +1249,7 @@ cascade up-front.
   endpoint). Fail-fast if neither is set. Selected by
   `QONTEXT_ROUTER=gliner2`. Requires `uv add gliner` and the
   Pioneer.ai fine-tune (see
-  `backend/retrieval/router_train/README.md`).
+  `pioneer/README.md`).
 
 **AgenticTier backend.** Hidden behind the `LLMClient` Protocol
 (mirrors how `Embedder` and `EntityRouter` are isolated):

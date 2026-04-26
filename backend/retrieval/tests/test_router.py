@@ -591,7 +591,7 @@ class TestParseGLiNER2Output:
 
 class TestEntityTypesAndIntentsFrozen:
     """The Pioneer.ai-fine-tune was trained against a fixed schema. If
-    these change, you must re-train (and update `router_train/prompt.md`).
+    these change, you must re-train (and update `pioneer/prompt.md`).
     Pin the schema by tests so a future refactor cannot silently drift."""
 
     def test_intents_frozen(self) -> None:
@@ -636,7 +636,7 @@ class TestGLiNER2EntityRouterIntegration:
         assert d.intent in INTENTS
         # The fine-tuned model SHOULD identify emp_1002 as an emp_id
         # span on a lookup-intent query. If it doesn't, the fine-tune
-        # needs more training data — see router_train/README.md.
+        # needs more training data — see pioneer/README.md.
         if d.intent == "lookup":
             assert "emp_1002" in d.entities.get("emp_id", [])
 

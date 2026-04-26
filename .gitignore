@@ -41,4 +41,4 @@ out/
 backend/eval/reports/
 
 # Pioneer.ai GLiNER2 fine-tuned weights (downloaded by human, not in git)
-backend/retrieval/router_train/weights/
+pioneer/weights/

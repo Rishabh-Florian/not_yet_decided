@@ -267,7 +267,7 @@ def build_orchestrator_with_store(store: object) -> CascadeOrchestrator:
     `PIONEER_AI_MODEL_ID` to use the fine-tuned GLiNER2 backend.
     Without those, the stub fallback keeps the cascade green but does
     NOT produce real NER spans — see
-    `backend/retrieval/router_train/README.md` for the Pioneer.ai
+    `pioneer/README.md` for the Pioneer.ai
     fine-tune workflow.
 
     AgenticTier LLM backend: selected via `QONTEXT_AGENTIC=gemini`
