@@ -32,6 +32,7 @@ from backend.retrieval.workflows import (
     WorkflowResult,
     build_workflow,
     list_workflows,
+    register_builtin_workflows,
 )
 
 from .models import (
@@ -113,6 +114,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         neo4j_password=cfg.NEO4J_PASSWORD,
         neo4j_database=cfg.NEO4J_DATABASE,
     )
+    # Built-in workflows must be registered before any /api/workflow
+    # request lands; explicit call replaces the previous import-side-
+    # effect registration in `workflows/__init__.py`.
+    register_builtin_workflows()
     app.state.store = store
     app.state.context_engine = _build_engine_with_store(store)
     yield

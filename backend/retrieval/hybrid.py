@@ -38,12 +38,11 @@ Embedding, vector query, fulltext query, and RRF fusion are private.
 from __future__ import annotations
 
 import json
-import re
 from typing import Any
 
 from backend.graph.store import GraphStore
-from backend.models.graph import Provenance
 
+from ._util import _citations_from_provenance, _escape_lucene, _preview
 from .embedder import Embedder
 from .index import (
     ENTITY_VECTOR_INDEX,
@@ -59,43 +58,6 @@ from .tiers import Tier
 # canonical SIGIR'09 paper; it strongly dampens the contribution of
 # tail ranks while still differentiating top results.
 _RRF_K: int = 60
-
-# Reserved Lucene chars in the fulltext arm's query. Mirror the escape
-# rule from `exact.py` rather than importing a private symbol — this
-# tier owns its own Lucene escape so the two tiers can evolve
-# independently without coupling.
-_LUCENE_SPECIAL = re.compile(r'([+\-!(){}\[\]^"~*?:\\/]|&&|\|\|)')
-
-
-def _escape_lucene(query: str) -> str:
-    return _LUCENE_SPECIAL.sub(r"\\\1", query)
-
-
-def _preview(attributes: dict[str, Any]) -> str:
-    """One-line summary of a node for `Hit.preview` (mirrors `exact.py`)."""
-    for key in ("name", "title", "subject", "summary", "description", "customer_name"):
-        v = attributes.get(key)
-        if isinstance(v, str) and v.strip():
-            return v.strip()[:200]
-    return json.dumps(attributes, ensure_ascii=False)[:200]
-
-
-def _citations_from_provenance(rows: list[Provenance]) -> list[Citation]:
-    cites: list[Citation] = []
-    for p in rows:
-        method = p.extraction_method
-        if method not in ("direct_mapping", "llm_extraction", "rule_based", "human"):
-            raise ValueError(f"unexpected extraction_method {method!r} in provenance")
-        cites.append(
-            Citation(
-                source_file=p.source_file,
-                source_record_id=p.source_record_id,
-                source_field=p.source_field,
-                raw_value=p.raw_value,
-                extraction_method=method,
-            )
-        )
-    return cites
 
 
 def _rrf_fuse(

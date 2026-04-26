@@ -16,12 +16,8 @@ import pytest
 from backend.graph.store import GraphStore
 from backend.models.graph import FactConfidence, Provenance
 from backend.retrieval import ExactTier, QueryContext
-from backend.retrieval.exact import (
-    _escape_lucene,
-    _extract_id_tokens,
-    _normalize_bm25,
-    _preview,
-)
+from backend.retrieval._util import _escape_lucene, _preview
+from backend.retrieval.exact import _extract_id_tokens, _normalize_bm25
 
 
 # ---------------------------------------------------------------------------
@@ -148,11 +144,6 @@ class TestExactTierConstruction:
         store = _mock_store()
         with pytest.raises(ValueError, match="lowercase identifier"):
             ExactTier(store, name="EXACT")
-
-    def test_rejects_bad_limit(self) -> None:
-        store = _mock_store()
-        with pytest.raises(ValueError, match="fulltext_limit"):
-            ExactTier(store, fulltext_limit=0)
 
     def test_default_name(self) -> None:
         store = _mock_store()

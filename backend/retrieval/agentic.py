@@ -517,8 +517,11 @@ class AgenticTier(Tier):
                 user_query=query,
                 tools=tools,
             )
-        except Exception:
-            return self._fail_result()
+        except Exception as e:
+            # Fail-fast: a misconfigured key / network outage / bad model id
+            # must surface as 500 with a useful message — not be silently
+            # masked as "no relevant context found" (relevance=0.0).
+            raise RuntimeError(f"agentic LLM call failed: {e}") from e
 
         iterations = 0
         last_text: str | None = None
@@ -560,10 +563,13 @@ class AgenticTier(Tier):
                     )
             try:
                 turn = self._llm.respond_to_tool_results(results)
-            except Exception:
-                return self._fail_result(
-                    answer=last_text, citations=cites.citations
-                )
+            except Exception as e:
+                # Fail-fast on LLM-client failure (see `start()` rationale
+                # above). Tool-call exceptions are caught separately and
+                # surfaced back to the model as `{"error": ...}` results.
+                raise RuntimeError(
+                    f"agentic LLM call failed: {e}"
+                ) from e
 
         # Final answer in `last_text`. Score per the algorithmic recipe.
         if last_text is None or not last_text.strip():

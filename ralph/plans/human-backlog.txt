@@ -161,3 +161,13 @@ AgenticTier uses, so it boots without a GEMINI key (tests inject
    convention). Frontend / docs that hardcode the URL must use the
    hyphenated form.
 
+---
+
+## 2026-04-26 — simplification-pass discovered items
+
+1. `backend/retrieval/tools.py:get_neighbors` (around L394–397)
+   silently `continue`s when `self._store.get_node(nid)` returns None
+   for an id `self._store.neighbors` just yielded. Same fail-fast
+   inconsistency as the one fixed in `thread_summary.py:455` during
+   this pass — out of scope for the simplification PR (plan only
+   listed `thread_summary.py`); should raise `RuntimeError` to match.

@@ -16,7 +16,8 @@ import pytest
 from backend.graph.store import GraphStore
 from backend.models.graph import FactConfidence, Provenance
 from backend.retrieval import HybridTier, QueryContext, StubEmbedder
-from backend.retrieval.hybrid import _escape_lucene, _preview, _rrf_fuse
+from backend.retrieval._util import _escape_lucene, _preview
+from backend.retrieval.hybrid import _rrf_fuse
 
 
 # ---------------------------------------------------------------------------

@@ -7,7 +7,7 @@ Public surface:
 * `WorkflowInput` / `WorkflowResult` — Pydantic v2 IO models.
 * `TierRegistry` — locked-subset view over the engine's tiers.
 * `register_workflow` / `get_workflow` / `list_workflows` /
-  `build_workflow` — registry operations.
+  `build_workflow` / `register_builtin_workflows` — registry operations.
 
 Concrete workflows:
 
@@ -16,8 +16,11 @@ Concrete workflows:
 * `ThreadSummaryWorkflow` (issue #9) — `thread-summary`, T3 cluster
   recall → bounded T4 agent loop (3-tool surface) → structured summary.
 
-Importing this package registers every shipped workflow as a
-side effect (the `register_workflow` decorator runs at import time).
+Importing this package no longer triggers workflow registration as a
+side effect — call `register_builtin_workflows()` (from
+`backend.retrieval.workflows.registry`) explicitly. The FastAPI
+lifespan does this at startup. Tests that want the built-ins must
+call it from a fixture.
 """
 from __future__ import annotations
 
@@ -28,6 +31,7 @@ from .registry import (
     clear_registry,
     get_workflow,
     list_workflows,
+    register_builtin_workflows,
     register_workflow,
 )
 from .thread_summary import (
@@ -50,5 +54,6 @@ __all__ = [
     "clear_registry",
     "get_workflow",
     "list_workflows",
+    "register_builtin_workflows",
     "register_workflow",
 ]

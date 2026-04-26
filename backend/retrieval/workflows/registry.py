@@ -96,6 +96,31 @@ def clear_registry() -> None:
     _REGISTRY.clear()
 
 
+def register_builtin_workflows() -> None:
+    """Register every workflow that ships with the package.
+
+    Idempotent: skips a workflow whose name is already registered (so a
+    second call after `clear_registry()` from a test fixture is safe).
+    Asserts loudly if either built-in failed to register — a missing
+    workflow at FastAPI startup is a deployment bug, not a runtime
+    condition.
+    """
+    from .customer_email import CustomerEmailWorkflow
+    from .thread_summary import ThreadSummaryWorkflow
+
+    for cls in (CustomerEmailWorkflow, ThreadSummaryWorkflow):
+        if cls.name not in _REGISTRY:
+            register_workflow(cls)
+    if "answer-customer-email" not in _REGISTRY:
+        raise RuntimeError(
+            "register_builtin_workflows: answer-customer-email failed to register"
+        )
+    if "thread-summary" not in _REGISTRY:
+        raise RuntimeError(
+            "register_builtin_workflows: thread-summary failed to register"
+        )
+
+
 def build_workflow(
     name: str,
     tiers_by_name: dict[str, Tier],

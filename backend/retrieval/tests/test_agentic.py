@@ -472,7 +472,12 @@ class TestAgenticToolErrorPassthrough:
 
 
 class TestAgenticLLMFailure:
-    def test_start_failure_returns_failed(self) -> None:
+    def test_start_failure_raises(self) -> None:
+        # Fail-fast: an LLM-client failure on `start()` (e.g. bad
+        # GEMINI_API_KEY, network outage) must surface as RuntimeError so
+        # the orchestrator returns a 500 with a useful message — never
+        # be silently masked as relevance=0.0 (which is indistinguishable
+        # from "no relevant context found").
         class _BoomLLM(StubLLMClient):
             def start(self, **kwargs):  # type: ignore[no-untyped-def]
                 raise RuntimeError("network down")
@@ -482,10 +487,8 @@ class TestAgenticLLMFailure:
             StubEmbedder(),
             _BoomLLM(scripted_turns=[LLMTurn(text="placeholder", tool_calls=[])]),
         )
-        result = tier.search("foo", QueryContext())
-        assert result.tier_used == "agentic"
-        assert result.relevance == RELEVANCE_FAILED
-        assert result.answer is None
+        with pytest.raises(RuntimeError, match="agentic LLM call failed"):
+            tier.search("foo", QueryContext())
 
 
 # ---------------------------------------------------------------------------

@@ -37,6 +37,7 @@ from typing import Any
 
 from backend.graph.store import GraphStore, parse_pattern
 
+from ._util import _preview as _attrs_preview
 from .embedder import Embedder
 from .index import (
     ENTITY_VECTOR_INDEX,
@@ -49,17 +50,9 @@ from .models import Citation, Hit
 # Hard caps: defensive backstops on per-tool result size so a single
 # tool call cannot blow the model's context. Tier loop applies a
 # separate cap on number of *calls* (max_iterations).
-_MAX_K: int = 25
-_MAX_DEPTH: int = 3
-_MAX_NEIGHBORS: int = 50
-
-
-def _attrs_preview(attrs: dict[str, Any]) -> str:
-    for key in ("name", "title", "subject", "summary", "description", "customer_name"):
-        v = attrs.get(key)
-        if isinstance(v, str) and v.strip():
-            return v.strip()[:200]
-    return json.dumps(attrs, ensure_ascii=False)[:200]
+_MAX_K: int = 25  # Per-tool cap to bound LLM context window; 25 fits in ~2KB for typical hits.
+_MAX_DEPTH: int = 3  # 3 hops covers practical neighborhood traversals; higher risks hub-node explosion.
+_MAX_NEIGHBORS: int = 50  # Caps fanout per neighbor call; prevents context overflow on hub nodes (e.g., a CEO with 200 reports).
 
 
 def _node_to_dict(store: GraphStore, node_id: str) -> dict[str, Any]:
@@ -274,8 +267,10 @@ class ToolBox:
             raise ValueError("query must be a non-empty string")
         if not isinstance(k, int) or not (1 <= k <= _MAX_K):
             raise ValueError(f"k must be int in [1, {_MAX_K}], got {k!r}")
-        # Local import to keep the tools module from pulling tier code.
-        from .exact import _escape_lucene, _normalize_bm25
+        # Local import to keep the tools module from pulling tier code
+        # eagerly (BM25 normalization lives with ExactTier's fulltext arm).
+        from ._util import _escape_lucene
+        from .exact import _normalize_bm25
 
         escaped = _escape_lucene(query)
         cypher = (

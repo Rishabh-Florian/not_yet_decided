@@ -70,7 +70,6 @@ from ..agentic import (
 from ..models import Citation, Hit, QueryContext
 from ..tools import CitationCollector, ToolDefinition, _attrs_preview, _node_to_dict
 from .base import TierRegistry, Workflow, WorkflowInput, WorkflowResult
-from .registry import register_workflow
 
 
 # Per-participant / per-topic top-k for the T3 starting cluster. Small
@@ -159,7 +158,6 @@ _LOOP_SYSTEM_PROMPT = (
 )
 
 
-@register_workflow
 class ThreadSummaryWorkflow(Workflow):
     """`thread-summary` — T3 semantic recall + T4 bounded agent loop +
     single-shot LLM compose.
@@ -455,7 +453,12 @@ class ThreadSummaryWorkflow(Workflow):
             for nid in ids:
                 n = self._store.get_node(nid)
                 if n is None:
-                    continue
+                    # `neighbors` returned an id we then can't read back —
+                    # store inconsistency, fail-fast (mirrors the same
+                    # check in `customer_email._gather_neighbors`).
+                    raise RuntimeError(
+                        f"thread_summary: get_node returned None for known id {nid!r}"
+                    )
                 cites.add_node(self._store, nid)
                 out.append(
                     {

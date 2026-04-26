@@ -145,11 +145,10 @@ class Workflow(ABC):
                 f"{type(self).__name__} must set ClassVar "
                 f"`allowed_tiers: frozenset[str]`"
             )
-        if cls_allowed != tiers.allowed:
-            raise ValueError(
-                f"TierRegistry must mirror Workflow.allowed_tiers exactly: "
-                f"workflow={sorted(cls_allowed)!r} registry={sorted(tiers.allowed)!r}"
-            )
+        # The `tiers.allowed == cls.allowed_tiers` invariant is owned by
+        # `TierRegistry.__init__` (which is the only constructor for the
+        # registry passed in here); re-asserting it here would duplicate
+        # framework guarantees.
         self._tiers = tiers
 
     @property

@@ -57,7 +57,6 @@ from backend.graph.store import GraphStore
 from ..agentic import LLMClient
 from ..models import Citation, Hit, QueryContext
 from .base import TierRegistry, Workflow, WorkflowInput, WorkflowResult
-from .registry import register_workflow
 
 
 # Issue spec: top-5 product candidates from the semantic search.
@@ -111,7 +110,6 @@ _SYSTEM_PROMPT = (
 )
 
 
-@register_workflow
 class CustomerEmailWorkflow(Workflow):
     """Frozen recipe: T1 sender lookup → T1 neighbors → T3 product
     semantic search → one-shot LLM compose.

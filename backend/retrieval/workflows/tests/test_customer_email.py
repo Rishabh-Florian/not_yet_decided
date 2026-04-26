@@ -397,25 +397,31 @@ class TestInputValidation:
 
 
 class TestAllowedTiersEnforcement:
-    def test_workflow_cannot_reach_for_agentic(self) -> None:
-        """Even though `allowed_tiers` is `{exact, hybrid}`, double-check
-        that the framework rejects an attempt to construct the workflow
-        with a wider TierRegistry."""
+    def test_build_workflow_locks_allowed_tiers(self) -> None:
+        """`build_workflow` is the framework entrypoint that constructs
+        a `TierRegistry` from `cls.allowed_tiers`; the resulting
+        registry exposes only those tiers, so `tiers.get("agentic")`
+        raises even if the engine has an `agentic` tier."""
         exact_tier = _ScriptedTier("exact", [_empty_result("exact")])
         hybrid_tier = _ScriptedTier("hybrid", [_empty_result("hybrid")])
         agentic_tier = _ScriptedTier("agentic", [_empty_result("agentic")])
         store = _stub_store()
         llm = StubLLMClient(scripted_turns=[LLMTurn(text="x", tool_calls=[])])
-        wider = TierRegistry(
+        if "answer-customer-email" not in list_workflows():
+            register_workflow(CustomerEmailWorkflow)
+        wf = build_workflow(
+            "answer-customer-email",
             {
                 "exact": exact_tier,
                 "hybrid": hybrid_tier,
                 "agentic": agentic_tier,
             },
-            frozenset({"exact", "hybrid", "agentic"}),  # wider than allowed
+            llm=llm,
+            store=store,
         )
-        with pytest.raises(ValueError, match="mirror"):
-            CustomerEmailWorkflow(wider, llm=llm, store=store)
+        assert wf.tiers.allowed == frozenset({"exact", "hybrid"})
+        with pytest.raises(KeyError, match="not in workflow allowed set"):
+            wf.tiers.get("agentic")
 
     def test_constructor_rejects_non_llm_instance(self) -> None:
         exact_tier = _ScriptedTier("exact", [_empty_result("exact")])

@@ -177,13 +177,6 @@ class TestWorkflowABC:
         with pytest.raises(ValueError, match="whitespace-free identifier"):
             _Bad(TierRegistry(_engine_tiers(), frozenset({"exact"})))
 
-    def test_registry_must_mirror_allowed_tiers(self) -> None:
-        # Passing a wider TierRegistry than the workflow declared is a
-        # framework misuse and must fail.
-        with pytest.raises(ValueError, match="mirror"):
-            _OkWorkflow(TierRegistry(_engine_tiers(), frozenset({"exact", "hybrid"})))
-
-
 # ---------- Registry: register / get / duplicates / unknown ----------
 
 

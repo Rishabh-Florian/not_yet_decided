@@ -23,14 +23,18 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any
 
 from backend.graph.store import GraphStore
-from backend.models.graph import Provenance
 
+from ._util import _citations_from_provenance, _escape_lucene, _preview
 from .index import NODE_TEXT_INDEX, ensure_indexes
 from .models import Citation, Hit, QueryContext, QueryResult
 from .tiers import Tier
+
+# Top-N hits returned by the fulltext fallback. Five is enough to give
+# the cascade orchestrator something to escalate-or-not on; we are not a
+# ranking surface, just a fast first-pass filter.
+_FULLTEXT_LIMIT: int = 5
 
 # ID-shaped tokens we recognize. Sourced from EnterpriseBench: employee ids
 # `emp_1234`, customer/client ids like `CLNT-0042`, ten-char ASIN-style
@@ -46,10 +50,6 @@ _ID_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"\b(?:ticket|conv|conversation|order|sale|product)[-_:][\w-]+\b", re.IGNORECASE),
 )
 
-# Reserved Lucene chars in the query syntax. We never construct boolean
-# fulltext queries — the user's text is escaped and forwarded verbatim.
-_LUCENE_SPECIAL = re.compile(r'([+\-!(){}\[\]^"~*?:\\/]|&&|\|\|)')
-
 
 def _extract_id_tokens(query: str) -> list[str]:
     seen: set[str] = set()
@@ -63,10 +63,6 @@ def _extract_id_tokens(query: str) -> list[str]:
     return tokens
 
 
-def _escape_lucene(query: str) -> str:
-    return _LUCENE_SPECIAL.sub(r"\\\1", query)
-
-
 def _normalize_bm25(raw_score: float) -> float:
     """Squash an unbounded Lucene/BM25 score into [0, 1).
 
@@ -76,39 +72,6 @@ def _normalize_bm25(raw_score: float) -> float:
     if raw_score < 0:
         raise ValueError(f"Lucene score must be >= 0, got {raw_score}")
     return raw_score / (1.0 + raw_score)
-
-
-def _preview(attributes: dict[str, Any]) -> str:
-    """One-line summary of a node for `Hit.preview`.
-
-    Picks the most useful human-readable field if present, else falls
-    back to the truncated JSON dump.
-    """
-    for key in ("name", "title", "subject", "summary", "description", "customer_name"):
-        v = attributes.get(key)
-        if isinstance(v, str) and v.strip():
-            return v.strip()[:200]
-    return json.dumps(attributes, ensure_ascii=False)[:200]
-
-
-def _citations_from_provenance(rows: list[Provenance]) -> list[Citation]:
-    cites: list[Citation] = []
-    for p in rows:
-        method = p.extraction_method
-        # Pydantic Literal in Citation requires the canonical four values; the
-        # store can only emit one of those four (validated at insert time).
-        if method not in ("direct_mapping", "llm_extraction", "rule_based", "human"):
-            raise ValueError(f"unexpected extraction_method {method!r} in provenance")
-        cites.append(
-            Citation(
-                source_file=p.source_file,
-                source_record_id=p.source_record_id,
-                source_field=p.source_field,
-                raw_value=p.raw_value,
-                extraction_method=method,
-            )
-        )
-    return cites
 
 
 class ExactTier(Tier):
@@ -130,7 +93,6 @@ class ExactTier(Tier):
         store: GraphStore,
         *,
         name: str = "exact",
-        fulltext_limit: int = 5,
     ) -> None:
         if not isinstance(store, GraphStore):
             raise TypeError(f"store must be GraphStore, got {type(store).__name__}")
@@ -138,11 +100,8 @@ class ExactTier(Tier):
             raise ValueError(
                 f"ExactTier name must be a non-empty lowercase identifier, got {name!r}"
             )
-        if fulltext_limit < 1:
-            raise ValueError(f"fulltext_limit must be >= 1, got {fulltext_limit}")
         self._store = store
         self._name = name
-        self._fulltext_limit = fulltext_limit
         ensure_indexes(store._driver, store._database)
 
     @property
@@ -233,7 +192,7 @@ class ExactTier(Tier):
         )
         with self._store._session() as s:
             rows = list(
-                s.run(cypher, q=escaped, limit=self._fulltext_limit)  # type: ignore[arg-type]
+                s.run(cypher, q=escaped, limit=_FULLTEXT_LIMIT)  # type: ignore[arg-type]
             )
 
         hits: list[Hit] = []
