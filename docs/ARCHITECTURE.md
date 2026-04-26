@@ -26,7 +26,6 @@
 | Cross-encoder rerank | not yet | one model call post-HybridTier |
 | Conflict resolution engine (detect + auto-route + REST) | **done** | `backend/conflict.py`, `GET/POST /api/conflicts*` |
 | Conflict resolution UI (inbox) | partial | engine + REST done; visual queue page not yet |
-| MCP server | not yet | thin wrappers over existing API |
 
 ---
 
@@ -396,8 +395,6 @@ EnterpriseBench — simulated enterprise dataset from Inazuma.co / Qontext.
 | customer_support_chats.json | JSON | 1,000 | Message nodes |
 | clients.json | JSON | 400 | Organization nodes |
 | vendors.json | JSON | 400 | Organization nodes |
-| Policy_Documents/ | PDF | 24 | Document nodes |
-| Customer_orders/ | PDF | 270 | Document nodes |
 
 **Graph stats (emails + employees ingested, 2026-04-26):**
 - 13,201 nodes

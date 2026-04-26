@@ -103,7 +103,7 @@ Without API keys, the system still runs: retrieval uses stub fallbacks at each t
 ```
 backend/            Python: graph store, adaptive ingestion, REST API, retrieval cascade, VFS, workflows, eval
 frontend/           Next.js 14 + React: graph viz, node browser, query UI, provenance timeline, edit form
-dataset/            EnterpriseBench source data (14 JSON/CSV sources + 24 policy PDFs + 270 invoice PDFs)
+dataset/            EnterpriseBench source data (14 JSON/CSV sources)
 ingest_specs/       Per-tenant per-source MappingSpec YAMLs (reviewed + promoted to active)
 scripts/            ingest_all.sh (bulk pipeline) + bootstrap_subgraph_nodes.py
 pioneer/            Fine-tuned GLiNER2 SLM weights + training pipeline + benchmark results
@@ -131,12 +131,17 @@ data/               Runtime SQLite db (gitignored)
 - **VFS** — 6 pure-Cypher operations (`ls/cat/stat/grep/find/tree`), surfaced as Gemini function-calling tools for AI agents.
 - **Workflow framework** — frozen-policy recipes over a locked tier subset. Two built-ins: `answer-customer-email` (T1 sender + neighbors → T3 product search → LLM compose) and `thread-summary` (T3 cluster recall → bounded 3-tool agent → structured markdown).
 - **Eval harness** — recall@5/@10, p50/p95 latency, per-tier termination, escalation rate. Reports to `backend/eval/reports/<timestamp>.md`.
-- **410 passing tests** — ingest agnosticism, pattern query, edit API, per-tier retrieval, tools, workflows, conflict resolution (unit + integration).
+- **433 passing tests** (21 skipped, 454 collected) — ingest agnosticism, pattern query, edit API, per-tier retrieval, tools, workflows, conflict resolution (unit + integration).
 
 ### Frontend
 
 - `/` — Landing page: animated rotating sphere, prompt chips, chatbar wired to `POST /api/query`, live result cards (tier used, relevance, latency).
+
+  ![Landing page](docs/landing_page.png)
+
 - `/app/graph` — Force-directed knowledge graph (react-force-graph-2d). FilterPanel with: node-type checkboxes, **subgraph Department + Location chips** (3 view modes: Dim/Isolate/Expand), time window, min-connections slider, source toggle, name search. Saved views persisted to localStorage.
+
+  ![Knowledge graph view with filter panel + provenance](docs/knowledge_graph_view.png)
 - `/app/nodes` — Paginated node browser. Node detail with provenance timeline (per-attribute extraction history) and raw-record drawer (verbatim original JSON from Layer 4).
 - `/app/query` — Pattern DSL query UI: `(Person)-[SENT]->(Message)` → paginated triples with full provenance.
 - `/app/edit/:id` — Inline node editor. Every edit tracked with `extraction_method="human"`, editor identity, and timestamp.
@@ -286,10 +291,10 @@ To run specific sources: `uv run bash scripts/ingest_all.sh emails employees`
 ## Running tests
 
 ```bash
-uv run pytest                          # all 331 tests
-uv run pytest backend/tests/test_ingest_agnostic.py  # vendor-agnostic ingest proof
-uv run pytest backend/tests/test_retrieval.py         # per-tier retrieval
-uv run pytest backend/tests/test_api_integration.py   # full API roundtrip
+uv run pytest                                                  # 433 passed, 21 skipped (454 collected)
+uv run pytest backend/test_ingest_agnostic.py                  # vendor-agnostic ingest proof
+uv run pytest backend/retrieval/tests/                         # per-tier retrieval suite
+uv run pytest backend/test_conflict.py backend/test_conflict_integration.py  # conflict resolution
 ```
 
 TypeScript:
