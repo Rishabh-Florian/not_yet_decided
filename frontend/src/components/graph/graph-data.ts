@@ -87,18 +87,14 @@ function nodeVal(raw: RawNode): number {
 }
 
 async function fetchCommunicationGraph(): Promise<GraphData> {
-  const [sentResult, receivedResult, memberOfResult] = await Promise.all([
+  const [sentResult, memberOfResult] = await Promise.all([
     apiPost<PatternQueryResponse>("/api/graph/query", {
       pattern: "(Person)-[SENT]->(Message)",
-      limit: 500,
-    }),
-    apiPost<PatternQueryResponse>("/api/graph/query", {
-      pattern: "(Message)-[RECEIVED]->(Person)",
-      limit: 2000,
+      limit: 150,
     }),
     apiPost<PatternQueryResponse>("/api/graph/query", {
       pattern: "(Person)-[MEMBER_OF]->(Organization)",
-      limit: 2000,
+      limit: 500,
     }),
   ]);
 
@@ -132,12 +128,6 @@ async function fetchCommunicationGraph(): Promise<GraphData> {
 
   for (const m of sentResult.matches) {
     addNode(m.source as RawNode);
-    addNode(m.target as RawNode);
-    addLink(m.source.id, m.target.id, m.edge.relation_type);
-  }
-
-  for (const m of receivedResult.matches) {
-    if (!nodeMap.has(m.source.id)) continue;
     addNode(m.target as RawNode);
     addLink(m.source.id, m.target.id, m.edge.relation_type);
   }
