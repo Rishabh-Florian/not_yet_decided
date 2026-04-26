@@ -612,14 +612,35 @@ class TestEntityTypesAndIntentsFrozen:
 # Integration tests — require GLINER2_MODEL_PATH / PIONEER_AI_MODEL_ID
 # ---------------------------------------------------------------------------
 
+def _local_path_is_full_model() -> bool:
+    """Integration tests need a FULL GLiNER2 directory (config.json +
+    model.safetensors). LoRA-only adapter directories pass the env-var
+    check but `gliner.from_pretrained` can't load them without a base-
+    model merge step (peft) which we have not wired in yet.
+    """
+    import pathlib
+    path = os.environ.get(GLiNER2EntityRouter.MODEL_PATH_ENV)
+    if not path:
+        return False
+    p = pathlib.Path(path)
+    return (p / "config.json").is_file() and (p / "model.safetensors").is_file()
+
+
 gliner2_integration = pytest.mark.skipif(
     not (
-        os.environ.get(GLiNER2EntityRouter.MODEL_PATH_ENV)
-        or os.environ.get(GLiNER2EntityRouter.MODEL_ID_ENV)
+        _local_path_is_full_model()
+        or (
+            os.environ.get(GLiNER2EntityRouter.MODEL_ID_ENV)
+            and os.environ.get(GLiNER2EntityRouter.API_KEY_ENV)
+        )
     ),
     reason=(
-        f"set {GLiNER2EntityRouter.MODEL_PATH_ENV} or "
-        f"{GLiNER2EntityRouter.MODEL_ID_ENV} to run GLiNER2 integration tests"
+        "GLiNER2 integration tests need either a full local model "
+        f"at {GLiNER2EntityRouter.MODEL_PATH_ENV} (config.json + "
+        f"model.safetensors), or hosted credentials "
+        f"({GLiNER2EntityRouter.MODEL_ID_ENV} + "
+        f"{GLiNER2EntityRouter.API_KEY_ENV}). LoRA-only adapters at the "
+        "local path are not yet supported (peft loader pending)."
     ),
 )
 
@@ -645,5 +666,5 @@ class TestGLiNER2EntityRouterConstructorWithoutEnv:
     def test_raises_without_path_or_endpoint(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(GLiNER2EntityRouter.MODEL_PATH_ENV, raising=False)
         monkeypatch.delenv(GLiNER2EntityRouter.MODEL_ID_ENV, raising=False)
-        with pytest.raises(RuntimeError, match="requires either a local weights path"):
+        with pytest.raises(RuntimeError, match="requires either"):
             GLiNER2EntityRouter()

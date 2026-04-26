@@ -5,6 +5,50 @@ policies) into a structured, inspectable, editable company memory backed by
 a knowledge graph with **fact-level provenance**. See
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full design.
 
+## Quick start
+
+Bring up Neo4j + the API + the fine-tuned router in three steps. Assumes
+Docker, Python, and `uv` installed.
+
+```sh
+# 1. Install deps and start Neo4j
+uv sync
+docker run -d -p 7687:7687 -p 7474:7474 \
+  -e NEO4J_AUTH=neo4j/better_context neo4j:5
+
+# 2. Configure .env at the repo root
+cat > .env <<'EOF'
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=better_context
+NEO4J_DATABASE=neo4j
+GEMINI_API_KEY=<get from https://aistudio.google.com/apikey>
+QONTEXT_AGENTIC=gemini
+QONTEXT_EMBEDDER=bge
+QONTEXT_ROUTER=gliner2
+GLINER2_MODEL_PATH=pioneer/weights/inazuma-gliner2-v2
+PIONEER_API_KEY=<from https://agent.pioneer.ai → API Keys>
+PIONEER_MODEL_ID=683f9b1f-dcbe-4162-89e6-f46a155882a1
+EOF
+
+# 3. Ingest data (one-time), populate embeddings, start API
+uv run bash scripts/ingest_all.sh                          # ~15 min
+uv run python -m backend.retrieval.embed                   # ~10 min
+uv run uvicorn backend.api.app:app --reload --port 8000
+# → API live at http://localhost:8000/docs
+```
+
+Frontend (Next.js) lives in `frontend/`:
+```sh
+cd frontend && npm install && npm run dev    # → http://localhost:3000
+```
+
+The frontend's main query box calls `POST /api/query`, which runs the
+4-tier cascade (`exact → router → hybrid → agentic`). The router is
+the fine-tuned 205M GLiNER2 SLM (97.8 % intent accuracy, beats GPT-4o
+— see `pioneer/bench/results/comparison.md`). Without the env vars
+above, the cascade still works using stub fallbacks at each tier.
+
 ## Layout
 
 ```

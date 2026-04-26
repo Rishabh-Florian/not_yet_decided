@@ -268,13 +268,18 @@ class GLiNER2EntityRouter:
     """
 
     MODEL_PATH_ENV: str = "GLINER2_MODEL_PATH"
-    MODEL_ID_ENV: str = "PIONEER_AI_MODEL_ID"
+    MODEL_ID_ENV: str = "PIONEER_MODEL_ID"
+    API_KEY_ENV: str = "PIONEER_API_KEY"
+    API_BASE_ENV: str = "PIONEER_API_BASE"
+    DEFAULT_API_BASE: str = "https://api.pioneer.ai/v1"
 
     def __init__(
         self,
         *,
         model_path: str | None = None,
         pioneer_model_id: str | None = None,
+        pioneer_api_key: str | None = None,
+        threshold: float = 0.95,
     ) -> None:
         path = model_path if model_path is not None else os.environ.get(self.MODEL_PATH_ENV)
         endpoint = (
@@ -282,60 +287,137 @@ class GLiNER2EntityRouter:
             if pioneer_model_id is not None
             else os.environ.get(self.MODEL_ID_ENV)
         )
-        if not path and not endpoint:
+        api_key = (
+            pioneer_api_key
+            if pioneer_api_key is not None
+            else os.environ.get(self.API_KEY_ENV)
+        )
+        # Two paths: hosted (PIONEER_MODEL_ID + PIONEER_API_KEY) or local
+        # (GLINER2_MODEL_PATH + gliner installed). Hosted wins if both
+        # are present — same accuracy, no PyTorch dependency to load.
+        self._hosted = bool(endpoint and api_key)
+        self._local = bool(path) and not self._hosted
+        if not self._hosted and not self._local:
             raise RuntimeError(
-                "GLiNER2EntityRouter requires either a local weights path "
-                f"({self.MODEL_PATH_ENV}=...) or a Pioneer.ai model id "
-                f"({self.MODEL_ID_ENV}=...). See "
-                "backend/retrieval/pioneer/README.md for fine-tuning "
-                "instructions. Use StubEntityRouter for tests / no-model "
-                "fallback."
+                "GLiNER2EntityRouter requires either:\n"
+                f"  (a) hosted: {self.MODEL_ID_ENV}=<id> + {self.API_KEY_ENV}=<key>, OR\n"
+                f"  (b) local:  {self.MODEL_PATH_ENV}=<weights-dir> (requires `uv add gliner`).\n"
+                "See pioneer/README.md. Use StubEntityRouter for tests / no-model fallback."
             )
-        try:
-            import gliner  # type: ignore[import-not-found]  # noqa: F401
-        except ImportError as e:
-            raise ImportError(
-                "GLiNER2EntityRouter requires the `gliner` package. "
-                "Install with `uv add gliner` after running the "
-                "Pioneer.ai fine-tune (see "
-                "backend/retrieval/pioneer/README.md)."
-            ) from e
+        if self._local:
+            try:
+                import gliner  # type: ignore[import-not-found]  # noqa: F401
+            except ImportError as e:
+                raise ImportError(
+                    "Local GLiNER2EntityRouter requires the `gliner` package. "
+                    "Install with `uv add gliner`, or switch to hosted mode by "
+                    f"setting {self.MODEL_ID_ENV} + {self.API_KEY_ENV}."
+                ) from e
         self._model_path = path
-        self._endpoint = endpoint
+        self._model_id = endpoint
+        self._api_key = api_key
+        self._api_base = os.environ.get(self.API_BASE_ENV, self.DEFAULT_API_BASE)
+        self._threshold = threshold
         self._model: object | None = None
+        self._http_client: object | None = None
 
-    def _ensure_model(self) -> object:
+    def _ensure_local_model(self) -> object:
         if self._model is None:
             from gliner import GLiNER  # type: ignore[import-not-found]
-
-            # Local weights take precedence; the endpoint path is a
-            # follow-up wiring once Pioneer publishes a stable
-            # inference URL convention.
-            if self._model_path is None:
-                raise RuntimeError(
-                    "GLiNER2EntityRouter: remote endpoint inference is not yet "
-                    f"implemented. Set {self.MODEL_PATH_ENV}=<weights-dir> after "
-                    "downloading the fine-tuned weights from Pioneer.ai."
-                )
             self._model = GLiNER.from_pretrained(self._model_path)
         return self._model
+
+    def _ensure_http_client(self) -> object:
+        if self._http_client is None:
+            import httpx
+            self._http_client = httpx.Client(timeout=30.0)
+        return self._http_client
+
+    def _classify_hosted(self, query: str) -> RouterDecision:
+        """Call Pioneer's hosted inference endpoint. Response shape:
+        ``{"entities": {<type>: [<spans>...], ...}, "intent": "<label>", ...}``.
+        Note: hosted endpoint does not return a calibrated intent score — we
+        emit 1.0 since the API has already applied its abstain threshold.
+        """
+        client = self._ensure_http_client()
+        url = f"{self._api_base}/chat/completions"
+        payload = {
+            "model": self._model_id,
+            "task": "schema",
+            "input": query,
+            "schema": {
+                "entities": list(ENTITY_TYPES),
+                "classifications": {"intent": list(INTENTS)},
+            },
+            "threshold": self._threshold,
+        }
+        headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+        }
+        resp = client.post(url, json=payload, headers=headers)  # type: ignore[attr-defined]
+        if resp.status_code != 200:
+            raise RuntimeError(
+                f"Pioneer inference HTTP {resp.status_code}: {resp.text[:200]}"
+            )
+        body = resp.json()
+        # Pioneer wraps the actual prediction either at top level or under
+        # `result` depending on the API version — handle both.
+        raw = body.get("result", body) if isinstance(body, dict) else body
+        return _parse_pioneer_hosted_output(raw)
 
     def classify(self, query: str) -> RouterDecision:
         if not isinstance(query, str):
             raise TypeError(f"query must be str, got {type(query).__name__}")
         if not query.strip():
             raise ValueError("query must be non-empty / non-whitespace")
-        model = self._ensure_model()
-        # GLiNER2 multi-task forward pass. Schema matches
-        # `pioneer/prompt.md`. The fine-tuned head returns
-        # ``{"classifications": {"intent": [{"label": ..., "score": ...}, ...]},
-        #    "entities": [{"label": "emp_id", "text": "emp_1002", "score": ...}, ...]}``.
+        if self._hosted:
+            return self._classify_hosted(query)
+        # Local path: GLiNER2 multi-task forward pass.
+        model = self._ensure_local_model()
         raw = model.predict(  # type: ignore[attr-defined]
             query,
             classifications={"intent": list(INTENTS)},
             entities={etype: f"{etype} entity" for etype in ENTITY_TYPES},
         )
         return _parse_gliner2_output(raw)
+
+
+def _parse_pioneer_hosted_output(raw: object) -> RouterDecision:
+    """Convert Pioneer's hosted-endpoint schema-task response into a
+    `RouterDecision`. Shape:
+
+        {"entities": {"emp_id": ["emp_0990"], "customer_id": [], ...},
+         "intent": "analytical",
+         "input_tokens": ..., "output_tokens": ..., "token_usage": ...}
+
+    Differs from local gliner output: intent at top level (no nested
+    `classifications.intent` list), entities as dict-of-lists (no
+    label/text/score objects). The hosted API has already applied its
+    abstain threshold, so we emit confidence=1.0 — the local stub-router
+    threshold (`min_intent_conf=0.5`) is therefore always satisfied.
+    """
+    if not isinstance(raw, dict):
+        raise RuntimeError(f"Pioneer hosted returned non-dict: {type(raw).__name__}")
+    intent = raw.get("intent")
+    if intent not in INTENTS:
+        raise RuntimeError(
+            f"Pioneer hosted returned unknown intent {intent!r}; "
+            f"expected one of {INTENTS}"
+        )
+    entities_raw = raw.get("entities", {})
+    if not isinstance(entities_raw, dict):
+        raise RuntimeError("Pioneer hosted 'entities' must be a dict")
+    spans: dict[str, list[str]] = {}
+    for etype, vals in entities_raw.items():
+        if etype not in ENTITY_TYPES:
+            continue
+        if not isinstance(vals, list):
+            raise RuntimeError(f"Pioneer hosted entities[{etype!r}] must be a list")
+        clean = [v for v in vals if isinstance(v, str) and v]
+        if clean:
+            spans[etype] = clean
+    return RouterDecision(intent=intent, confidence=1.0, entities=spans)
 
 
 def _parse_gliner2_output(raw: object) -> RouterDecision:
