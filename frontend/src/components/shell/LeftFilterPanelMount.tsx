@@ -18,6 +18,8 @@ export default function LeftFilterPanelMount() {
       visibleCount={filtered.visibleCount}
       totalCount={filtered.totalCount}
       availableSources={filtered.availableSources}
+      availableDepartments={filtered.availableDepartments}
+      availableLocations={filtered.availableLocations}
       maxDegree={filtered.maxDegree}
     />
   );

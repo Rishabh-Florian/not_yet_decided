@@ -1,0 +1,162 @@
+canonical_aliases: {}
+edges:
+- canonical_type: REPORTS_TO
+  fields: []
+  source_node: '@employee'
+  target_node: '@manager'
+- canonical_type: REPORTS_TO
+  fields: []
+  source_node: '@reportee'
+  target_node: '@employee'
+llm_blocks: []
+nodes:
+- canonical_type: Person
+  fields:
+  - attribute: emp_id
+    pii: false
+    required: false
+    source: $.emp_id
+    transform: []
+  - attribute: name
+    pii: false
+    required: false
+    source: $.Name
+    transform: []
+  - attribute: email
+    pii: true
+    required: false
+    source: $.email
+    transform:
+    - normalize_email
+  - attribute: category
+    pii: false
+    required: false
+    source: $.category
+    transform: []
+  - attribute: description
+    pii: false
+    required: false
+    source: $.description
+    transform: []
+  - attribute: experience
+    pii: false
+    required: false
+    source: $.Experience
+    transform: []
+  - attribute: skills
+    pii: false
+    required: false
+    source: $.skills
+    transform: []
+  - attribute: level
+    pii: false
+    required: false
+    source: $.Level
+    transform: []
+  - attribute: date_of_joining
+    pii: false
+    required: false
+    source: $.DOJ
+    transform: []
+  - attribute: date_of_leaving
+    pii: false
+    required: false
+    source: $.DOL
+    transform: []
+  - attribute: salary
+    pii: true
+    required: false
+    source: $.Salary
+    transform: []
+  - attribute: total_casual_leaves
+    pii: false
+    required: false
+    source: $['Total Casual Leaves']
+    transform: []
+  - attribute: remaining_casual_leaves
+    pii: false
+    required: false
+    source: $['Remaining Casual Leaves']
+    transform: []
+  - attribute: total_sick_leaves
+    pii: false
+    required: false
+    source: $['Total Sick Leaves']
+    transform: []
+  - attribute: remaining_sick_leaves
+    pii: false
+    required: false
+    source: $['Remaining Sick Leaves']
+    transform: []
+  - attribute: total_vacation_leaves
+    pii: false
+    required: false
+    source: $['Total Vacation Leaves']
+    transform: []
+  - attribute: remaining_vacation_leaves
+    pii: false
+    required: false
+    source: $['Remaining Vacation Leaves']
+    transform: []
+  - attribute: total_leaves_taken
+    pii: false
+    required: false
+    source: $['Total Leaves Taken']
+    transform: []
+  - attribute: age
+    pii: true
+    required: false
+    source: $.Age
+    transform: []
+  - attribute: performance_rating
+    pii: false
+    required: false
+    source: $['Performance Rating']
+    transform: []
+  - attribute: marital_status
+    pii: true
+    required: false
+    source: $['Marital Status']
+    transform: []
+  - attribute: gender
+    pii: true
+    required: false
+    source: $.Gender
+    transform: []
+  - attribute: is_valid
+    pii: false
+    required: false
+    source: $.is_valid
+    transform: []
+  id_required_fields:
+  - $.emp_id
+  id_template: person:{emp_id}
+  name: employee
+- canonical_type: Person
+  fields:
+  - attribute: manager_emp_id
+    pii: false
+    required: false
+    source: $.reports_to
+    transform: []
+  id_required_fields:
+  - $.reports_to
+  id_template: person:{manager_emp_id}
+  name: manager
+- canonical_type: Person
+  fields:
+  - attribute: reportee_emp_id
+    pii: false
+    required: false
+    source: $.reportees[*]
+    transform: []
+  id_required_fields:
+  - $.reportees[*]
+  id_template: person:{reportee_emp_id}
+  name: reportee
+source:
+  file_pattern: Human_Resource_Management/Employees/employees.json
+  format: json
+  record_path: $[*]
+spec_version: 2
+tenant: enterprisebench

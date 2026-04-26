@@ -8,6 +8,9 @@ import {
   HUB_DEGREE_THRESHOLD,
   MESSAGE_COLOR,
   MESSAGE_SIZE,
+  ORG_DEPT_COLOR,
+  ORG_LOC_COLOR,
+  ORG_SIZE,
   PERSON_COLOR,
   PERSON_SIZE,
   useGraphData,
@@ -21,6 +24,8 @@ const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), { ssr: false 
 const NODE_TYPE_LABELS = [
   { type: "Person", color: PERSON_COLOR, size: PERSON_SIZE },
   { type: "Message", color: MESSAGE_COLOR, size: MESSAGE_SIZE },
+  { type: "Dept", color: ORG_DEPT_COLOR, size: ORG_SIZE },
+  { type: "Location", color: ORG_LOC_COLOR, size: ORG_SIZE },
 ];
 
 const DIM_NODE_OPACITY = 0.05;

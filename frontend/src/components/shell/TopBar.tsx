@@ -15,10 +15,10 @@ export default function TopBar() {
   const pathname = usePathname();
 
   return (
-    <header className="h-11 flex items-center gap-4 px-4 border-b border-border-color bg-bg-card shrink-0">
-      <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-        <GitGraph size={15} className="text-accent" />
-        <span className="text-sm font-semibold text-text-primary tracking-tight">Better Context</span>
+    <header className="h-14 flex items-center gap-4 px-5 border-b border-border-color bg-bg-card shrink-0">
+      <Link href="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
+        <GitGraph size={20} className="text-accent" />
+        <span className="text-base font-semibold text-text-primary tracking-tight">Better Context</span>
       </Link>
 
       <div className="w-px h-4 bg-border-color" />

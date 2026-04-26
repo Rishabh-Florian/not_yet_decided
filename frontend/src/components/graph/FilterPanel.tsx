@@ -1,13 +1,15 @@
 "use client";
-import { Filter, RotateCcw, Search } from "lucide-react";
-import { useId } from "react";
-import { ALL_TYPES, useFilterStore } from "@/store/filter-store";
+import { Filter, RotateCcw, Search, Bookmark, Trash2, Plus, ChevronDown, ChevronUp } from "lucide-react";
+import { useId, useState } from "react";
+import { ALL_TYPES, useFilterStore, type ViewMode } from "@/store/filter-store";
 import { NODE_TYPE_COLORS } from "@/lib/utils";
 
 interface FilterPanelProps {
   visibleCount: number;
   totalCount: number;
   availableSources: string[];
+  availableDepartments: string[];
+  availableLocations: string[];
   maxDegree: number;
 }
 
@@ -19,6 +21,12 @@ const TIME_OPTIONS: { label: string; days: number | null }[] = [
   { label: "90d", days: 90 },
 ];
 
+const VIEW_MODES: { mode: ViewMode; label: string; title: string }[] = [
+  { mode: "dim", label: "Dim", title: "Show all nodes; matched ones at full opacity, rest faded" },
+  { mode: "isolate", label: "Isolate", title: "Show only matched nodes and edges between them" },
+  { mode: "expand", label: "Expand", title: "Matched nodes plus all their direct neighbors" },
+];
+
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div className="px-3 pt-3 pb-1.5 text-[10px] font-medium uppercase tracking-widest text-text-tertiary">
@@ -27,10 +35,41 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
+function FacetChip({
+  label,
+  active,
+  anyActive,
+  onToggle,
+}: {
+  label: string;
+  active: boolean;
+  anyActive: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      onClick={onToggle}
+      aria-pressed={active}
+      title={active ? `Remove ${label} filter` : `Show only ${label}`}
+      className={`rounded-md border px-2 py-0.5 font-mono text-[11px] transition-colors ${
+        active
+          ? "border-accent/40 bg-accent-bg text-accent"
+          : anyActive
+            ? "border-border-color-subtle bg-transparent text-text-tertiary hover:border-border-color hover:text-text-secondary"
+            : "border-border-color-subtle bg-transparent text-text-secondary hover:border-border-color hover:text-text-primary"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
 export default function FilterPanel({
   visibleCount,
   totalCount,
   availableSources,
+  availableDepartments,
+  availableLocations,
   maxDegree,
 }: FilterPanelProps) {
   const entityTypes = useFilterStore((s) => s.entityTypes);
@@ -43,10 +82,34 @@ export default function FilterPanel({
   const toggleSource = useFilterStore((s) => s.toggleSource);
   const searchQuery = useFilterStore((s) => s.searchQuery);
   const setSearchQuery = useFilterStore((s) => s.setSearchQuery);
+  const subgraph = useFilterStore((s) => s.subgraph);
+  const toggleDepartment = useFilterStore((s) => s.toggleDepartment);
+  const toggleLocation = useFilterStore((s) => s.toggleLocation);
+  const viewMode = useFilterStore((s) => s.viewMode);
+  const setViewMode = useFilterStore((s) => s.setViewMode);
+  const clearSubgraph = useFilterStore((s) => s.clearSubgraph);
+  const savedViews = useFilterStore((s) => s.savedViews);
+  const saveCurrentView = useFilterStore((s) => s.saveCurrentView);
+  const loadView = useFilterStore((s) => s.loadView);
+  const deleteView = useFilterStore((s) => s.deleteView);
   const reset = useFilterStore((s) => s.reset);
 
   const sliderId = useId();
   const sliderMax = Math.max(10, maxDegree);
+
+  const anyDeptActive = (subgraph.departments?.size ?? 0) > 0;
+  const anyLocActive = (subgraph.locations?.size ?? 0) > 0;
+  const subgraphActive = anyDeptActive || anyLocActive;
+
+  const [saveName, setSaveName] = useState("");
+  const [showSavedViews, setShowSavedViews] = useState(false);
+
+  function handleSave() {
+    const name = saveName.trim();
+    if (!name) return;
+    saveCurrentView(name);
+    setSaveName("");
+  }
 
   return (
     <div
@@ -58,8 +121,8 @@ export default function FilterPanel({
         <span>Filters</span>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto pb-2">
-        {/* Show */}
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-2">
+        {/* Show node types */}
         <SectionLabel>Show</SectionLabel>
         <div className="space-y-0.5 px-1.5">
           {ALL_TYPES.map((type) => {
@@ -87,6 +150,153 @@ export default function FilterPanel({
             );
           })}
         </div>
+
+        {/* Subgraph section */}
+        {(availableDepartments.length > 0 || availableLocations.length > 0) && (
+          <>
+            <div className="mx-3 mt-3 mb-1.5 border-t border-border-color-subtle" />
+            <div className="flex items-center justify-between px-3 pb-1.5">
+              <span className="text-[10px] font-medium uppercase tracking-widest text-text-tertiary">
+                Subgraph
+              </span>
+              {subgraphActive && (
+                <button
+                  onClick={clearSubgraph}
+                  className="font-mono text-[10px] text-text-tertiary hover:text-accent transition-colors"
+                  title="Clear subgraph filters"
+                >
+                  clear
+                </button>
+              )}
+            </div>
+
+            {/* View mode toggle — only shown when subgraph filter is active */}
+            {subgraphActive && (
+              <div className="px-3 pb-2">
+                <div className="flex rounded-md border border-border-color-subtle overflow-hidden">
+                  {VIEW_MODES.map(({ mode, label, title }) => (
+                    <button
+                      key={mode}
+                      onClick={() => setViewMode(mode)}
+                      title={title}
+                      aria-pressed={viewMode === mode}
+                      className={`flex-1 py-1 font-mono text-[10px] transition-colors ${
+                        viewMode === mode
+                          ? "bg-accent-bg text-accent"
+                          : "text-text-tertiary hover:text-text-secondary"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Department chips */}
+            {availableDepartments.length > 0 && (
+              <>
+                <div className="px-3 pb-0.5 text-[10px] font-medium text-text-tertiary">
+                  Department
+                </div>
+                <div className="flex flex-wrap gap-1 px-3 pb-1.5">
+                  {availableDepartments.map((dept) => (
+                    <FacetChip
+                      key={dept}
+                      label={dept}
+                      active={subgraph.departments?.has(dept) ?? false}
+                      anyActive={anyDeptActive}
+                      onToggle={() => toggleDepartment(dept)}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* Location chips */}
+            {availableLocations.length > 0 && (
+              <>
+                <div className="px-3 pb-0.5 text-[10px] font-medium text-text-tertiary">
+                  Location
+                </div>
+                <div className="flex flex-wrap gap-1 px-3 pb-1.5">
+                  {availableLocations.map((loc) => (
+                    <FacetChip
+                      key={loc}
+                      label={loc}
+                      active={subgraph.locations?.has(loc) ?? false}
+                      anyActive={anyLocActive}
+                      onToggle={() => toggleLocation(loc)}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* Save current view */}
+            {subgraphActive && (
+              <div className="px-3 pb-1.5">
+                <div className="flex gap-1">
+                  <input
+                    type="text"
+                    value={saveName}
+                    onChange={(e) => setSaveName(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleSave()}
+                    placeholder="Name this view…"
+                    className="flex-1 rounded-md border border-border-color-subtle bg-bg-hover px-2 py-1 font-mono text-[11px] text-text-primary placeholder:text-text-tertiary focus:border-accent/40 focus:outline-none"
+                  />
+                  <button
+                    onClick={handleSave}
+                    disabled={!saveName.trim()}
+                    title="Save current view"
+                    className="rounded-md border border-border-color-subtle px-2 py-1 text-text-tertiary transition-colors hover:border-accent/40 hover:text-accent disabled:opacity-30"
+                  >
+                    <Plus size={11} />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Saved views */}
+            {savedViews.length > 0 && (
+              <div className="px-3 pb-1.5">
+                <button
+                  onClick={() => setShowSavedViews((v) => !v)}
+                  className="flex w-full items-center gap-1 text-[10px] font-medium text-text-tertiary hover:text-text-secondary transition-colors"
+                >
+                  <Bookmark size={9} />
+                  <span>Saved views ({savedViews.length})</span>
+                  {showSavedViews ? <ChevronUp size={9} className="ml-auto" /> : <ChevronDown size={9} className="ml-auto" />}
+                </button>
+                {showSavedViews && (
+                  <div className="mt-1 space-y-0.5">
+                    {savedViews.map((view) => (
+                      <div key={view.id} className="flex items-center gap-1 rounded-md px-1 py-0.5 hover:bg-bg-hover group">
+                        <button
+                          onClick={() => loadView(view.id)}
+                          className="flex-1 truncate text-left font-mono text-[11px] text-text-secondary hover:text-text-primary"
+                          title={`Load: ${view.filter.departments?.join(", ") ?? "all"} / ${view.filter.locations?.join(", ") ?? "all"} (${view.viewMode})`}
+                        >
+                          {view.name}
+                        </button>
+                        <span className="font-mono text-[9px] text-text-tertiary">{view.viewMode}</span>
+                        <button
+                          onClick={() => deleteView(view.id)}
+                          className="opacity-0 group-hover:opacity-100 text-text-tertiary hover:text-red-400 transition-all"
+                          title="Delete saved view"
+                        >
+                          <Trash2 size={9} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="mx-3 mb-1 border-t border-border-color-subtle" />
+          </>
+        )}
 
         {/* Time */}
         <SectionLabel>Time</SectionLabel>
@@ -120,7 +330,7 @@ export default function FilterPanel({
         <div className="px-3 pb-1">
           <div className="flex items-center justify-between pb-1 font-mono text-[11px] text-text-tertiary">
             <label htmlFor={sliderId} className="text-text-secondary">
-              ≥ {minConnections}
+              &ge; {minConnections}
             </label>
             <span>max {sliderMax}</span>
           </div>

@@ -6,8 +6,11 @@ import type { PatternQueryResponse } from "@/types/api";
 
 export const PERSON_COLOR = "#E8E8E5";
 export const MESSAGE_COLOR = "#6B7280";
+export const ORG_DEPT_COLOR = "#818CF8";   // indigo — Department org nodes
+export const ORG_LOC_COLOR = "#34D399";    // emerald — Location org nodes
 export const PERSON_SIZE = 6;
 export const MESSAGE_SIZE = 3;
+export const ORG_SIZE = 8;
 export const HUB_DEGREE_THRESHOLD = 12;
 
 export interface GNode {
@@ -19,6 +22,11 @@ export interface GNode {
   degree: number;
   timestamp: number | null;
   source: string | null;
+  // Subgraph facets — populated from attributes
+  department: string | null;
+  location: string | null;
+  // For Organization nodes: "Department" | "Location" | null
+  orgSubtype: string | null;
 }
 
 export interface GLink {
@@ -61,14 +69,35 @@ function deriveTimestamp(raw: RawNode): number | null {
   return null;
 }
 
+function nodeColor(raw: RawNode): string {
+  if (raw.type === "Person") return PERSON_COLOR;
+  if (raw.type === "Message") return MESSAGE_COLOR;
+  if (raw.type === "Organization") {
+    const sub = raw.attributes.subtype;
+    if (sub === "Location") return ORG_LOC_COLOR;
+    return ORG_DEPT_COLOR;
+  }
+  return MESSAGE_COLOR;
+}
+
+function nodeVal(raw: RawNode): number {
+  if (raw.type === "Person") return PERSON_SIZE;
+  if (raw.type === "Organization") return ORG_SIZE;
+  return MESSAGE_SIZE;
+}
+
 async function fetchCommunicationGraph(): Promise<GraphData> {
-  const [sentResult, receivedResult] = await Promise.all([
+  const [sentResult, receivedResult, memberOfResult] = await Promise.all([
     apiPost<PatternQueryResponse>("/api/graph/query", {
       pattern: "(Person)-[SENT]->(Message)",
       limit: 500,
     }),
     apiPost<PatternQueryResponse>("/api/graph/query", {
       pattern: "(Message)-[RECEIVED]->(Person)",
+      limit: 2000,
+    }),
+    apiPost<PatternQueryResponse>("/api/graph/query", {
+      pattern: "(Person)-[MEMBER_OF]->(Organization)",
       limit: 2000,
     }),
   ]);
@@ -78,16 +107,19 @@ async function fetchCommunicationGraph(): Promise<GraphData> {
 
   function addNode(raw: RawNode) {
     if (nodeMap.has(raw.id)) return;
-    const isPerson = raw.type === "Person";
+    const a = raw.attributes;
     nodeMap.set(raw.id, {
       id: raw.id,
       type: raw.type,
       name: nodeDisplayName(raw),
-      val: isPerson ? PERSON_SIZE : MESSAGE_SIZE,
-      color: isPerson ? PERSON_COLOR : MESSAGE_COLOR,
+      val: nodeVal(raw),
+      color: nodeColor(raw),
       degree: 0,
       timestamp: deriveTimestamp(raw),
       source: deriveSource(raw),
+      department: typeof a.category === "string" ? a.category : null,
+      location: typeof a.office_location === "string" ? a.office_location : null,
+      orgSubtype: typeof a.subtype === "string" ? a.subtype : null,
     });
   }
 
@@ -106,6 +138,12 @@ async function fetchCommunicationGraph(): Promise<GraphData> {
 
   for (const m of receivedResult.matches) {
     if (!nodeMap.has(m.source.id)) continue;
+    addNode(m.target as RawNode);
+    addLink(m.source.id, m.target.id, m.edge.relation_type);
+  }
+
+  for (const m of memberOfResult.matches) {
+    addNode(m.source as RawNode);
     addNode(m.target as RawNode);
     addLink(m.source.id, m.target.id, m.edge.relation_type);
   }

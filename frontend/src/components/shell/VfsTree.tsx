@@ -19,7 +19,7 @@ export default function VfsTree() {
   const onGraph = pathname?.startsWith("/app/graph") ?? false;
 
   return (
-    <div className="flex flex-col h-full bg-bg overflow-y-auto select-none">
+    <div className="flex flex-col flex-none bg-bg overflow-y-auto select-none">
       <button
         onClick={() => setExpanded((e) => !e)}
         className="flex items-center gap-2 px-3 py-2.5 text-xs font-medium text-text-tertiary uppercase tracking-widest hover:text-text-secondary transition-colors border-b border-border-color-subtle"
