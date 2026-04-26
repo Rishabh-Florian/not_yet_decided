@@ -65,9 +65,9 @@ NEO4J_USER=neo4j
 NEO4J_PASSWORD=better_context
 NEO4J_DATABASE=neo4j
 GEMINI_API_KEY=<get from https://aistudio.google.com/apikey>
-QONTEXT_AGENTIC=gemini
-QONTEXT_EMBEDDER=bge
-QONTEXT_ROUTER=gliner2
+BETTER_CONTEXT_AGENTIC=gemini
+BETTER_CONTEXT_EMBEDDER=bge
+BETTER_CONTEXT_ROUTER=gliner2
 GLINER2_MODEL_PATH=pioneer/weights/inazuma-gliner2-v2
 PIONEER_API_KEY=<from https://agent.pioneer.ai → API Keys>
 PIONEER_MODEL_ID=683f9b1f-dcbe-4162-89e6-f46a155882a1
@@ -115,7 +115,7 @@ data/               Runtime SQLite db (gitignored)
 ### Backend
 
 - **Knowledge graph store** — Neo4j (graph + content + embeddings) + SQLite (provenance traces + raw records). `MERGE`-on-id dedup, deterministic edge ids via `sha256(src|rel|tgt)`, atomic-tx pattern. 13,201 nodes, 26,937 edges, 200,907 provenance records ingested.
-- **Conflict resolution** — detection at the `add_node` MERGE seam (`backend/conflict.py`). Per attribute that disagrees, a deterministic decision table routes by `FactConfidence` rung (HUMAN > EXACT > GROUNDED > INFERRED): equal values auto-merge, ladder-broken ties auto-pick the higher rung, both INFERRED route to LLM_TRIAGE (live Gemini call, gated on `QONTEXT_AGENTIC=gemini`), tied confident-rung ESCALATE to a queue. REST surface: `GET /api/conflicts`, `GET /api/conflicts/{id}`, `POST /api/conflicts/{id}/resolve`. Human resolutions go through `edit_node` so they carry `FactConfidence.HUMAN` provenance and are reversible like any edit.
+- **Conflict resolution** — detection at the `add_node` MERGE seam (`backend/conflict.py`). Per attribute that disagrees, a deterministic decision table routes by `FactConfidence` rung (HUMAN > EXACT > GROUNDED > INFERRED): equal values auto-merge, ladder-broken ties auto-pick the higher rung, both INFERRED route to LLM_TRIAGE (live Gemini call, gated on `BETTER_CONTEXT_AGENTIC=gemini`), tied confident-rung ESCALATE to a queue. REST surface: `GET /api/conflicts`, `GET /api/conflicts/{id}`, `POST /api/conflicts/{id}/resolve`. Human resolutions go through `edit_node` so they carry `FactConfidence.HUMAN` provenance and are reversible like any edit.
 - **Adaptive ingestion** — `MappingSpec` YAML per (tenant, source) drives a deterministic ingestor. Gemini Flash 2.5 drafts the spec once; idempotent on `(spec_version, source_file, record_id, content_hash)`. Drift detection aborts on schema change. Proven vendor-agnostic: 4 different CRM shapes collapse to identical canonical nodes through one `Ingestor` (`test_ingest_agnostic.py`).
 - **Organizational subgraph** — bootstrap script injects synthetic `office_location` onto all 1,260 Person nodes (deterministic from `sha256(emp_id) % 5`) and creates explicit `Organization` nodes for 8 departments + 5 locations with `MEMBER_OF` edges.
 - **Identity resolution** — deterministic email-match → `SAME_AS` edges (preserves per-source provenance, no merge).

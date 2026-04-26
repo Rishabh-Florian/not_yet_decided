@@ -251,7 +251,7 @@ def build_orchestrator_with_store(store: object) -> CascadeOrchestrator:
       * `stub.escalate_below = 0.0` — terminal: never escalates past.
 
     Embedder selection: defaults to `StubEmbedder` so the cascade boots
-    without any optional model dependency. Set `QONTEXT_EMBEDDER=bge`
+    without any optional model dependency. Set `BETTER_CONTEXT_EMBEDDER=bge`
     in the environment to use `BgeSmallEmbedder` (`BAAI/bge-small-en-v1.5`,
     requires `sentence-transformers`). Without the BGE backend the
     hybrid tier is wired but its semantic recall is non-functional —
@@ -261,7 +261,7 @@ def build_orchestrator_with_store(store: object) -> CascadeOrchestrator:
     `uv run python -m backend.retrieval.embed` once Neo4j has data).
 
     Router backend selection: defaults to `StubEntityRouter` (regex
-    fallback, deterministic, no model). Set `QONTEXT_ROUTER=gliner2`
+    fallback, deterministic, no model). Set `BETTER_CONTEXT_ROUTER=gliner2`
     AND one of `GLINER2_MODEL_PATH` (local weights) or
     `PIONEER_AI_MODEL_ID` to use the fine-tuned GLiNER2 backend.
     Without those, the stub fallback keeps the cascade green but does
@@ -269,13 +269,13 @@ def build_orchestrator_with_store(store: object) -> CascadeOrchestrator:
     `pioneer/README.md` for the Pioneer.ai
     fine-tune workflow.
 
-    AgenticTier LLM backend: selected via `QONTEXT_AGENTIC=gemini`
+    AgenticTier LLM backend: selected via `BETTER_CONTEXT_AGENTIC=gemini`
     (requires `GEMINI_API_KEY`). Default is `noop` — a `StubLLMClient`
     scripted with a single `"agentic backend not configured"` prose
     answer so the cascade still returns a typed result without
     pretending to reason. Real analytical queries need
-    `QONTEXT_AGENTIC=gemini` plus a working API key. See
-    `ralph/plans/human-backlog.txt` for the env-setup checklist.
+    `BETTER_CONTEXT_AGENTIC=gemini` plus a working API key. See
+    `harness/ralph/plans/human-backlog.txt` for the env-setup checklist.
 
     `store` is typed as `object` to dodge an import cycle
     (`backend.graph.store` imports `backend.models`). The runtime check
@@ -300,30 +300,36 @@ def build_orchestrator_with_store(store: object) -> CascadeOrchestrator:
         GLiNER2EntityRouter,
         RouterTier,
         StubEntityRouter,
+        TwoModelEntityRouter,
     )
     from .tiers import StubTier
 
     if not isinstance(store, GraphStore):
         raise TypeError(f"store must be GraphStore, got {type(store).__name__}")
-    embedder_kind = os.environ.get("QONTEXT_EMBEDDER", "stub").lower()
+    embedder_kind = os.environ.get("BETTER_CONTEXT_EMBEDDER", "stub").lower()
     if embedder_kind == "bge":
         embedder: Embedder = BgeSmallEmbedder()
     elif embedder_kind == "stub":
         embedder = StubEmbedder()
     else:
         raise ValueError(
-            f"QONTEXT_EMBEDDER must be 'bge' or 'stub', got {embedder_kind!r}"
+            f"BETTER_CONTEXT_EMBEDDER must be 'bge' or 'stub', got {embedder_kind!r}"
         )
-    router_kind = os.environ.get("QONTEXT_ROUTER", "stub").lower()
+    router_kind = os.environ.get("BETTER_CONTEXT_ROUTER", "stub").lower()
     if router_kind == "gliner2":
         entity_router: EntityRouter = GLiNER2EntityRouter()
+    elif router_kind == "two-model":
+        # Production: v2 schema for intent + v3 NER-only for entities,
+        # called in parallel via threadpool. See pioneer/MODELS.md.
+        entity_router = TwoModelEntityRouter()
     elif router_kind == "stub":
         entity_router = StubEntityRouter()
     else:
         raise ValueError(
-            f"QONTEXT_ROUTER must be 'stub' or 'gliner2', got {router_kind!r}"
+            f"BETTER_CONTEXT_ROUTER must be 'stub', 'gliner2', or 'two-model', "
+            f"got {router_kind!r}"
         )
-    agentic_kind = os.environ.get("QONTEXT_AGENTIC", "noop").lower()
+    agentic_kind = os.environ.get("BETTER_CONTEXT_AGENTIC", "noop").lower()
     if agentic_kind == "gemini":
         llm: LLMClient = GeminiLLMClient()
     elif agentic_kind == "noop":
@@ -334,7 +340,7 @@ def build_orchestrator_with_store(store: object) -> CascadeOrchestrator:
         llm = NoopLLMClient()
     else:
         raise ValueError(
-            f"QONTEXT_AGENTIC must be 'gemini' or 'noop', got {agentic_kind!r}"
+            f"BETTER_CONTEXT_AGENTIC must be 'gemini' or 'noop', got {agentic_kind!r}"
         )
     exact = ExactTier(store)
     router_tier = RouterTier(entity_router, exact)

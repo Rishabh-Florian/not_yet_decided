@@ -132,4 +132,4 @@ analytical; etc.). Pioneer's agent confirmed this is the correct path.
 2. This `comparison.md` (filled in)
 3. `pioneer/README.md` — workflow + prompt + seed schema
 4. Integration code: `backend/retrieval/router.py:GLiNER2EntityRouter` (already shipped, env-gated)
-5. Live demo: `QONTEXT_ROUTER=gliner2 uv run uvicorn backend.api.app:app` then `POST /api/query` with a freeform NL question that the fine-tuned router classifies as `analytical` and routes to AgenticTier
+5. Live demo: `BETTER_CONTEXT_ROUTER=gliner2 uv run uvicorn backend.api.app:app` then `POST /api/query` with a freeform NL question that the fine-tuned router classifies as `analytical` and routes to AgenticTier

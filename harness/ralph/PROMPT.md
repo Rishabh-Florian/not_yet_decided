@@ -1,4 +1,4 @@
-@plans/prd.json @plans/progress.txt @plans/human-backlog.txt @../CLAUDE.md @../PRINCIPLES.md
+@plans/prd.json @plans/progress.txt @plans/human-backlog.txt @../../CLAUDE.md @../PRINCIPLES.md
 
 You are running inside the Ralph autonomous loop. One iteration = one feature shipped.
 
@@ -32,6 +32,6 @@ You are running inside the Ralph autonomous loop. One iteration = one feature sh
 ## Hard rules
 
 - Fail-fast: no `try/except` swallowing, no `.get(k, default)` to hide missing data. Crash early with clear errors.
-- Deep modules: prefer fewer files with rich interfaces over many shallow ones (see PRINCIPLES.md).
+- Deep modules: prefer fewer files with rich interfaces over many shallow ones (see harness/PRINCIPLES.md).
 - Never skip hooks (`--no-verify`) or bypass type/lint checks to "get it green".
 - Never delete `progress.txt`, `human-backlog.txt`, or other people's commits.

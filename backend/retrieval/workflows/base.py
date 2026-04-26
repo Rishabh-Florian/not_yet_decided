@@ -19,7 +19,7 @@ every access. Fail-fast at the boundary.
 `WorkflowResult` extends `QueryResult` so workflow output is structurally
 indistinguishable from cascade output: same `items` / `citations` /
 `tier_used` / `relevance` shape. The orchestration framework wraps tiers,
-it does not invent a new relevance shape (per PRINCIPLES.md: algorithmic
+it does not invent a new relevance shape (per harness/PRINCIPLES.md: algorithmic
 relevance only). The `tier_used` field on a workflow result is set to
 the producing tier's name — when a workflow fuses multiple tiers, it
 picks the dominant one (workflow-defined) and surfaces that.

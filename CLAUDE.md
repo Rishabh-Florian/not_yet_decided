@@ -11,12 +11,12 @@ It is **not** a stack. Backend/frontend/styling/deploy are picked at hackathon T
 ## Components (what lives where)
 
 - `CLAUDE.md` — this file. Harness rules + pointers.
-- `PRINCIPLES.md` — coding principles. Read on first use of session, then again before any architecture decision.
+- `harness/PRINCIPLES.md` — coding principles. Read on first use of session, then again before any architecture decision.
 - `README.md` — human-facing quickstart + hackathon-day runbook.
 - `.claude/settings.json` — hooks (PostToolUse fmt/lint), permission allowlist.
 - `.mcp.json` — project MCPs: **playwright** (browser feedback loop), **remotion** (demo videos).
-- `skills-install.sh` — one-shot installer for human-mode skills (Pocock + Emil). **Do not run inside the Ralph loop.**
-- `ralph/` — autonomous loop kit. `ralph.sh <iterations>` runs the loop; `PROMPT.md` is its system prompt; `plans/` holds live state (`prd.json`, `progress.txt`, `human-backlog.txt`).
+- `harness/skills-install.sh` — one-shot installer for human-mode skills (Pocock + Emil). **Do not run inside the Ralph loop.**
+- `harness/ralph/` — autonomous loop kit. `ralph.sh <iterations>` runs the loop; `PROMPT.md` is its system prompt; `plans/` holds live state (`prd.json`, `progress.txt`, `human-backlog.txt`).
 - `recipes/` — markdown-only stack picks (backend, frontend, e2e-typesafety, styling, motion, demo, deploy). Pick combos, follow install commands.
 - `ci-templates/` — inert GitHub Actions YAML. Copy chosen ones into `.github/workflows/` once stack is decided.
 - `docs/` — extended philosophy reference: deep-modules, ddd-glossary, failure-modes.
@@ -24,7 +24,7 @@ It is **not** a stack. Backend/frontend/styling/deploy are picked at hackathon T
 ## Two operating modes
 
 1. **Human-driven** (you + Florian, interactive): use installed skills (`/grill-me`, `/write-a-prd`, `/prd-to-issues`, `/tdd`, `/improve-codebase-architecture`, Emil's UI skill). Used to elicit specs, write PRDs, file GitHub issues with label `ralph`, then polish hero/demo manually.
-2. **Autonomous (Ralph)**: `bash ralph/ralph.sh <N>`. You run headlessly, consume issues labeled `ralph`, ship one feature per iteration, exit on `<promise>COMPLETE</promise>`. Skills are not invoked here — `ralph/PROMPT.md` is self-contained.
+2. **Autonomous (Ralph)**: `bash harness/ralph/ralph.sh <N>`. You run headlessly, consume issues labeled `ralph`, ship one feature per iteration, exit on `<promise>COMPLETE</promise>`. Skills are not invoked here — `harness/ralph/PROMPT.md` is self-contained.
 
 ## Coding principles (do not re-derive — these are decided)
 
@@ -48,13 +48,13 @@ It is **not** a stack. Backend/frontend/styling/deploy are picked at hackathon T
 
 ## How to set up this template (first run after clone)
 
-1. Read this file + `PRINCIPLES.md`.
-2. Run `bash skills-install.sh` once (human mode only).
+1. Read this file + `harness/PRINCIPLES.md`.
+2. Run `bash harness/skills-install.sh` once (human mode only).
 3. Pick stack from `recipes/`: typically one each from backend/, frontend/, e2e-typesafety/, styling/, motion/, demo/, deploy/. Follow install commands.
 4. Copy relevant `ci-templates/*.yml` into `.github/workflows/` once the stack is up.
 5. Create GitHub issues for the work (label `ralph` for autonomous items).
-6. `cp ralph/prd.sample.json ralph/plans/prd.json` (or let Ralph populate from `gh issue list`).
-7. Start the loop: `bash ralph/ralph.sh 20`.
+6. `cp harness/ralph/prd.sample.json harness/ralph/plans/prd.json` (or let Ralph populate from `gh issue list`).
+7. Start the loop: `bash harness/ralph/ralph.sh 20`.
 
 ## Hard rules for you (the agent)
 

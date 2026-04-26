@@ -28,7 +28,7 @@ model.load_adapter("pioneer/weights/inazuma-gliner2-v2")
 Or hit the Pioneer hosted endpoint with model id
 `683f9b1f-db87-4eba-9cf8-719b1350251d`.
 
-Wire into cascade: `QONTEXT_ROUTER=gliner2 GLINER2_MODEL_PATH=pioneer/weights/inazuma-gliner2-v2`.
+Wire into cascade: `BETTER_CONTEXT_ROUTER=gliner2 GLINER2_MODEL_PATH=pioneer/weights/inazuma-gliner2-v2`.
 Without those, cascade falls back to `StubEntityRouter` (regex).
 
 See `pioneer/README.md` and `pioneer/bench/results/comparison.md`.

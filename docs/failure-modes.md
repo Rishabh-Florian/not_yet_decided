@@ -46,7 +46,7 @@ Expanded version of the table in `CLAUDE.md`. Pattern: name the failure → name
 **Cause**: limited context window + shallow module structure → agent can't find the right file → re-implements logic that already exists, or modifies the wrong copy.
 
 **Countermeasure**:
-- **Deep modules** (PRINCIPLES.md §2). Fewer files, richer interfaces. Agent can fit the whole module in context.
+- **Deep modules** (harness/PRINCIPLES.md §2). Fewer files, richer interfaces. Agent can fit the whole module in context.
 - Ubiquitous language (`docs/ddd-glossary.md`) — searches succeed because there's only one name per concept.
 - `progress.txt` and `human-backlog.txt` — persistent cross-iteration memory the agent reads at the start of every Ralph loop iteration.
 
@@ -56,7 +56,7 @@ Expanded version of the table in `CLAUDE.md`. Pattern: name the failure → name
 
 **Countermeasure**:
 - Hard-coded in `~/.claude/CLAUDE.md`: forbidden patterns explicitly listed.
-- Reinforced in PRINCIPLES.md §1.
+- Reinforced in harness/PRINCIPLES.md §1.
 - Code review (manual) flags any blanket `except` block.
 
 ## 7. Agent gets stuck on something that needs a human
@@ -64,7 +64,7 @@ Expanded version of the table in `CLAUDE.md`. Pattern: name the failure → name
 **Cause**: missing credentials, account access, ambiguous spec, etc. Without an out, the agent burns iterations on the same blocker.
 
 **Countermeasure**:
-- `ralph/plans/human-backlog.txt` — append blocker, mark PRD item `blocked: true`, move to next item. Loop keeps moving; human reviews the backlog later.
+- `harness/ralph/plans/human-backlog.txt` — append blocker, mark PRD item `blocked: true`, move to next item. Loop keeps moving; human reviews the backlog later.
 
 ## 8. Schema drift between backend and frontend
 

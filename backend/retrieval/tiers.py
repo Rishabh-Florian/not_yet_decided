@@ -26,7 +26,7 @@ class Tier(ABC):
     Implementations MUST be deterministic w.r.t. their declared inputs
     (the query string and `QueryContext`). They MUST raise on unrecoverable
     errors — never return an empty result to mask a failure (see
-    PRINCIPLES.md §1: fail fast).
+    harness/PRINCIPLES.md §1: fail fast).
     """
 
     @property

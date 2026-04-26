@@ -32,8 +32,10 @@ node_modules/
 dist/
 build/
 out/
+# accidental npm install at repo root (frontend/package-lock.json is the real one)
+/package-lock.json
 
-# skills (regenerable from skills-lock.json via skills-install.sh)
+# skills (regenerable from harness/skills-lock.json via harness/skills-install.sh)
 .agents/
 .claude/
 

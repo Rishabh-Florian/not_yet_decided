@@ -288,7 +288,7 @@ Frozen-policy recipes: a `Workflow` declares `allowed_tiers: frozenset[str]` at 
 | 1 | Values equal after `strip().casefold()` | `AUTO_MERGE` | Keep existing; both provenance records appended |
 | 2 | Either side is `HUMAN` confidence | `AUTO_PICK` (HUMAN wins) | Write HUMAN side; provenance appended |
 | 3 | Different rungs on the ladder | `AUTO_PICK` (higher rung wins) | Write winning side; provenance appended |
-| 4 | Both `INFERRED` | `LLM_TRIAGE` | Keep existing; queue conflict row; Gemini call resolves when `QONTEXT_AGENTIC=gemini` |
+| 4 | Both `INFERRED` | `LLM_TRIAGE` | Keep existing; queue conflict row; Gemini call resolves when `BETTER_CONTEXT_AGENTIC=gemini` |
 | 5 | Same rung at EXACT/GROUNDED, values differ | `ESCALATE` | Keep existing; queue conflict row for human review |
 
 Confidence ladder: `HUMAN > EXACT > GROUNDED > INFERRED`

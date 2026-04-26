@@ -66,7 +66,7 @@ Refactor when the third concrete user shows up — never before.
 
 ## 7. No half-finished implementations
 
-Don't leave `// TODO: implement properly` in shipped code. If you can't finish it now, raise `NotImplementedError` and add it to `ralph/plans/human-backlog.txt`. Crashes are louder than TODOs.
+Don't leave `// TODO: implement properly` in shipped code. If you can't finish it now, raise `NotImplementedError` and add it to `harness/ralph/plans/human-backlog.txt`. Crashes are louder than TODOs.
 
 ## 8. Trust the framework
 

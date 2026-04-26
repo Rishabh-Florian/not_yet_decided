@@ -247,7 +247,7 @@ class StubLLMClient(LLMClient):
 class NoopLLMClient(LLMClient):
     """Always-returns-one-fixed-text LLM stand-in.
 
-    Used by `build_orchestrator_with_store` when `QONTEXT_AGENTIC` is
+    Used by `build_orchestrator_with_store` when `BETTER_CONTEXT_AGENTIC` is
     `noop` (the default). Cascade fallthrough to AgenticTier with this
     backend produces a marker answer + ungrounded relevance (0.3) so
     the cascade escalates past to `stub`. This keeps the cascade
@@ -258,7 +258,7 @@ class NoopLLMClient(LLMClient):
     """
 
     DEFAULT_TEXT: str = (
-        "AgenticTier is not configured (set QONTEXT_AGENTIC=gemini and "
+        "AgenticTier is not configured (set BETTER_CONTEXT_AGENTIC=gemini and "
         "GEMINI_API_KEY). No analytical reasoning was performed."
     )
 

@@ -118,18 +118,18 @@ def _build_engine_with_store(store: GraphStore) -> ContextEngine:
 
 
 def _build_llm_from_env() -> object:
-    """Mirror the QONTEXT_AGENTIC selection in build_orchestrator_with_store
+    """Mirror the BETTER_CONTEXT_AGENTIC selection in build_orchestrator_with_store
     so workflows that need an LLM (thread-summary, customer-email) get the
     same backend the cascade uses.
     """
     from backend.retrieval.agentic import GeminiLLMClient, NoopLLMClient
 
-    kind = os.environ.get("QONTEXT_AGENTIC", "noop").lower()
+    kind = os.environ.get("BETTER_CONTEXT_AGENTIC", "noop").lower()
     if kind == "gemini":
         return GeminiLLMClient()
     if kind == "noop":
-        return NoopLLMClient(text="workflow LLM not configured (set QONTEXT_AGENTIC=gemini)")
-    raise ValueError(f"QONTEXT_AGENTIC must be 'gemini' or 'noop', got {kind!r}")
+        return NoopLLMClient(text="workflow LLM not configured (set BETTER_CONTEXT_AGENTIC=gemini)")
+    raise ValueError(f"BETTER_CONTEXT_AGENTIC must be 'gemini' or 'noop', got {kind!r}")
 
 
 @asynccontextmanager

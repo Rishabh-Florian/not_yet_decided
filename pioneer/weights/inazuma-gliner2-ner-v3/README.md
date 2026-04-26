@@ -31,7 +31,7 @@ both in parallel via ThreadPoolExecutor.
 
 ```sh
 # .env
-QONTEXT_ROUTER=two-model
+BETTER_CONTEXT_ROUTER=two-model
 PIONEER_INTENT_MODEL_ID=683f9b1f-db87-4eba-9cf8-719b1350251d  # v2 schema
 PIONEER_NER_MODEL_ID=ee1a87ae-2611-4eed-9f66-64437d40e0bb     # v3 NER
 PIONEER_API_KEY=<your key>
