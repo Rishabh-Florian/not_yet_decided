@@ -80,4 +80,15 @@
 - ARCHITECTURE.md doc deferred to #8 (first concrete workflow lands there).
 - Next: #8 (R5b answer-customer-email workflow).
 
+### 2026-04-26 — #8 done (R5b answer-customer-email — deterministic workflow)
+- backend/retrieval/workflows/customer_email.py: CustomerEmailWorkflow.
+- name: "answer-customer-email"; allowed_tiers: frozenset({"exact","hybrid"}) — agentic excluded.
+- Fixed sequence: (1) exact.search(normalized_email)→sender or relevance=0 unknown_sender; (2) GraphStore.neighbors(sender_id, depth=1, cap=25); (3) hybrid.search(body, top-5 product candidates); (4) LLMClient.start(brief, tools=[]) single-shot compose (no tool loop; tool calls in compose response → RuntimeError).
+- I/O: CustomerEmailInput(from_address, subject, body, thread_history); WorkflowResult.extras={from_address, sender_node_id, related_count, product_candidate_count}.
+- build_workflow extended with **extras to thread llm/store deps without bloating framework.
+- Citations dedup'd on (source_file, source_record_id, source_field).
+- Verifiers: ruff clean, pyright 0 errors, pytest 283 passed / 16 skipped.
+- Backlog: API endpoint extras wiring, SAME_AS-cluster identity, p95 benchmark, URL-slug doc fix.
+- Next: #9 (R5c thread-summary).
+
 ---

@@ -1256,6 +1256,72 @@ cascade up-front.
   source_field)` so the score reflects unique evidence, not call
   count.
 
+**Workflow API (frozen-policy retrieval)** -- LANDED (R5a + R5b)
+
+Cascade is the right default for ad-hoc queries. Some flows have a
+known shape — the answer-customer-email flow always wants
+customer + tickets/sales + product context, never agentic
+reasoning. Hard-coding the recipe per workflow cuts latency and cost
+predictably (no escalation logic, no router pre-pass) and lets the
+LLM do only what it's good at: drafting natural language from a
+deterministic brief.
+
+```
+GET  /api/workflow                                      # discovery: registered workflow names
+POST /api/workflow/{name}                               # invoke a registered workflow
+  body: { "payload": {...workflow-specific...},
+          "ctx": {...QueryContext...} }
+→ WorkflowResult (extends QueryResult with `workflow` + `extras`)
+```
+
+A workflow declares `name` and `allowed_tiers: frozenset[str]` at
+class level. The framework wraps the live tier set in a `TierRegistry`
+locked to that subset — `registry.get("agentic")` raises if
+`"agentic"` is not in the workflow's `allowed_tiers`. The frozen
+policy is enforced at every tier access, not in the workflow body.
+Workflows are registered via the `@register_workflow` decorator on
+import; `build_workflow(name, tiers_by_name, **extras)` is the
+factory the API endpoint uses.
+
+| Workflow | Status | Tiers used | Issue |
+|---|---|---|---|
+| `answer-customer-email` | LANDED (R5b) | `exact` (sender lookup + neighbor traversal) + `hybrid` (product semantic search) + LLM compose (single-shot, `tools=[]`) | #8 |
+| `thread-summary` | pending | TBD | #9 |
+
+**`answer-customer-email` recipe** (`backend/retrieval/workflows/customer_email.py`):
+
+1. **T1 / ExactTier** — query the lowercased `from_address`.
+   ExactTier's id-token regex won't match a plain email, so it falls
+   through to the Lucene fulltext index over `node_text` and recovers
+   any node carrying that email in an indexed field. **Miss → abort
+   early** with `relevance=0.0`, `extras.reason="unknown_sender"`,
+   no LLM call.
+2. **T1 / GraphStore.neighbors** — one-hop traversal around the
+   resolved sender node id, capped at 25 neighbors so a hub customer
+   doesn't blow the compose prompt. Each neighbor becomes a `Hit`
+   with `score=1.0` (direct graph adjacency, not retrieval ranking).
+3. **T3 / HybridTier** — RRF-fused vector + BM25 search over the
+   email body; top 5 hits land as candidate products.
+4. **LLM compose** — single-shot call through the same `LLMClient`
+   protocol AgenticTier uses, but with `tools=[]` (no function
+   calling — the LLM cannot reach back into the cascade). The prompt
+   is a structured brief assembled from steps 1–3, with explicit
+   instruction to cite by node id using `[node:<id>]` markers and to
+   only cite ids that appear in the brief.
+
+`allowed_tiers = frozenset({"exact", "hybrid"})` — `agentic` is
+intentionally excluded so the path stays under the issue's p95 ≤ 2s
+budget. The compose LLM is allowed for natural-language drafting
+only; routing and tool selection remain deterministic.
+
+The `WorkflowResult.tier_used` is set to `"exact"` (the spine of the
+recipe — the customer match drives the result's relevance). `extras`
+carries `{from_address, sender_node_id, related_count,
+product_candidate_count}` for diagnostics. Citations are accumulated
+across steps 1–3 and deduplicated on
+`(source_file, source_record_id, source_field)` so the UI sees one
+row per piece of evidence.
+
 **Eval harness** (`backend/eval/`):
 
 * `golden.load_golden_set()` extracts `(query, expected_node_ids)`

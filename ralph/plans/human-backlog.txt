@@ -124,3 +124,40 @@ relevance 0.3 (ungrounded) so the cascade escalates past it to
 `stub`. `analytical` intent queries from the router will still hit
 AgenticTier (route_to honored) but produce no real reasoning.
 
+---
+
+## 2026-04-26 — #8 answer-customer-email follow-ups
+
+The workflow is shipped behind the same `LLMClient` Protocol that
+AgenticTier uses, so it boots without a GEMINI key (tests inject
+`StubLLMClient`). To wire it up end-to-end:
+
+1. **API endpoint construction.** `POST /api/workflow/answer-customer-email`
+   currently only threads `tiers_by_name` through `build_workflow`.
+   This workflow needs `llm` + `store` extras — the API route in
+   `backend/api/app.py` must be updated to pass them, e.g.:
+   ```
+   wf = build_workflow(name, engine.tiers_by_name,
+                       llm=app.state.llm_client, store=app.state.store)
+   ```
+   `app.state.llm_client` needs lifespan-time wiring (default
+   `NoopLLMClient`, override via `QONTEXT_AGENTIC=gemini`). Without
+   this, the workflow endpoint will 400 with a TypeError on missing
+   kwargs. (Other workflows that take only `tiers` continue to work
+   via the existing call shape.)
+2. **Identity-resolution `SAME_AS` clusters.** The workflow currently
+   only does deterministic email normalization (lowercase + strip).
+   Cluster-aware sender lookup (so `buyer@acme.com` resolves to a
+   `Person` node fronted by a `SAME_AS` edge from a `Customer` alias
+   node) is the issue's "implementation note" path; punted to a
+   follow-up after #11 (identity-resolver upgrade).
+3. **Latency benchmarking.** Issue acceptance: p95 ≤ 2s. Needs
+   real Neo4j + populated embeddings + a live Gemini key. Add to the
+   eval harness as a separate `workflow:answer-customer-email`
+   benchmark scenario.
+4. **URL slug.** Issue body mentions `/api/workflow/customer_email`
+   (underscore); workflow registers as `answer-customer-email`
+   (hyphen, matching the issue title and the agreed naming
+   convention). Frontend / docs that hardcode the URL must use the
+   hyphenated form.
+

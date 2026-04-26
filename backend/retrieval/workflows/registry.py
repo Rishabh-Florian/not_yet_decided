@@ -19,13 +19,17 @@ current engine.
 """
 from __future__ import annotations
 
+from typing import Any, TypeVar
+
 from ..tiers import Tier
 from .base import TierRegistry, Workflow
 
 _REGISTRY: dict[str, type[Workflow]] = {}
 
+_W = TypeVar("_W", bound=Workflow)
 
-def register_workflow(cls: type[Workflow]) -> type[Workflow]:
+
+def register_workflow(cls: type[_W]) -> type[_W]:
     """Register a `Workflow` subclass by its `name` ClassVar.
 
     Returns the class so it can be used as a decorator:
@@ -92,7 +96,11 @@ def clear_registry() -> None:
     _REGISTRY.clear()
 
 
-def build_workflow(name: str, tiers_by_name: dict[str, Tier]) -> Workflow:
+def build_workflow(
+    name: str,
+    tiers_by_name: dict[str, Tier],
+    **extras: Any,
+) -> Workflow:
     """Instantiate the registered workflow, restricting its tier view to
     its declared `allowed_tiers`.
 
@@ -100,7 +108,16 @@ def build_workflow(name: str, tiers_by_name: dict[str, Tier]) -> Workflow:
     the orchestrator). The `TierRegistry` constructor enforces that
     every name in `cls.allowed_tiers` is present in `tiers_by_name`;
     a missing tier is a deployment bug and raises immediately.
+
+    `extras` are forwarded as keyword arguments to the workflow
+    subclass's constructor — non-trivial workflows (e.g. compose-with-
+    LLM ones) need additional dependencies that the framework knows
+    nothing about (an `LLMClient`, a `GraphStore`). The framework
+    contract here is intentionally narrow: pass anything that's not
+    `tiers` as a kwarg, and the subclass is responsible for declaring
+    and validating it. A subclass that does not accept an `extras` kw
+    raises `TypeError` at construction — fail-fast, no silent drop.
     """
     cls = get_workflow(name)
     registry = TierRegistry(tiers_by_name, cls.allowed_tiers)
-    return cls(registry)
+    return cls(registry, **extras)

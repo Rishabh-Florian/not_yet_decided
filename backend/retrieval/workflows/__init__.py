@@ -9,12 +9,19 @@ Public surface:
 * `register_workflow` / `get_workflow` / `list_workflows` /
   `build_workflow` — registry operations.
 
-Specific workflow implementations land in #8 (answer-customer-email)
-and #9 (thread-summary). This package ships only the framework.
+Concrete workflows:
+
+* `CustomerEmailWorkflow` (issue #8) — `answer-customer-email`,
+  T1 sender lookup → T1 neighbors → T3 product search → LLM compose.
+* `thread-summary` (issue #9) — pending.
+
+Importing this package registers every shipped workflow as a
+side effect (the `register_workflow` decorator runs at import time).
 """
 from __future__ import annotations
 
 from .base import TierRegistry, Workflow, WorkflowInput, WorkflowResult
+from .customer_email import CustomerEmailInput, CustomerEmailWorkflow
 from .registry import (
     build_workflow,
     clear_registry,
@@ -24,6 +31,8 @@ from .registry import (
 )
 
 __all__ = [
+    "CustomerEmailInput",
+    "CustomerEmailWorkflow",
     "TierRegistry",
     "Workflow",
     "WorkflowInput",
