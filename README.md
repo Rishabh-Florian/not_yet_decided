@@ -5,6 +5,8 @@
 
 Better Context ingests the full EnterpriseBench dataset (email, HR, CRM, IT tickets, policies, code) into a structured, inspectable, editable **company memory** — a knowledge graph with fact-level provenance, a virtual file system, and a live web UI for both humans and AI agents.
 
+![Better Context — system design](docs/system_design_architecture_diagram.png)
+
 ---
 
 ## What it does
