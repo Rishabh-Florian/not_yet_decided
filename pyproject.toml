@@ -15,6 +15,7 @@ dependencies = [
     "sentence-transformers>=5.4.1",
     "gliner>=0.2.26",
     "python-multipart>=0.0.26",
+    "peft<0.19",
 ]
 
 [build-system]

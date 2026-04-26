@@ -316,19 +316,48 @@ def build_orchestrator_with_store(store: object) -> CascadeOrchestrator:
         raise ValueError(
             f"BETTER_CONTEXT_EMBEDDER must be 'bge' or 'stub', got {embedder_kind!r}"
         )
-    router_kind = os.environ.get("BETTER_CONTEXT_ROUTER", "stub").lower()
-    if router_kind == "gliner2":
-        entity_router: EntityRouter = GLiNER2EntityRouter()
+    router_kind = os.environ.get("BETTER_CONTEXT_ROUTER", "auto").lower()
+
+    def _try_hosted() -> EntityRouter | None:
+        if not (
+            os.environ.get(TwoModelEntityRouter.INTENT_MODEL_ID_ENV)
+            and os.environ.get(TwoModelEntityRouter.NER_MODEL_ID_ENV)
+            and os.environ.get(TwoModelEntityRouter.API_KEY_ENV)
+        ):
+            return None
+        return TwoModelEntityRouter()
+
+    def _try_local() -> EntityRouter | None:
+        # Prefer the v3 NER-only adapter (best NER); falls back to v2 schema
+        # if v3 is missing. Path explicit so users can override via
+        # GLINER2_MODEL_PATH for a custom adapter.
+        from pathlib import Path
+        path = os.environ.get(GLiNER2EntityRouter.MODEL_PATH_ENV)
+        if not path:
+            for cand in ("pioneer/weights/inazuma-gliner2-ner-v3", "pioneer/weights/inazuma-gliner2-v2"):
+                if (Path(cand) / "adapter_config.json").is_file():
+                    path = cand
+                    break
+        if not path:
+            return None
+        try:
+            return GLiNER2EntityRouter(model_path=path)
+        except (ImportError, RuntimeError):
+            return None
+
+    if router_kind == "auto":
+        # Hosted first (one HTTPS call, no model load), then local LoRA, then stub.
+        entity_router: EntityRouter | None = _try_hosted() or _try_local() or StubEntityRouter()
     elif router_kind == "two-model":
-        # Production: v2 schema for intent + v3 NER-only for entities,
-        # called in parallel via threadpool. See pioneer/MODELS.md.
         entity_router = TwoModelEntityRouter()
+    elif router_kind == "gliner2":
+        entity_router = GLiNER2EntityRouter()
     elif router_kind == "stub":
         entity_router = StubEntityRouter()
     else:
         raise ValueError(
-            f"BETTER_CONTEXT_ROUTER must be 'stub', 'gliner2', or 'two-model', "
-            f"got {router_kind!r}"
+            f"BETTER_CONTEXT_ROUTER must be 'auto', 'stub', 'gliner2', or "
+            f"'two-model', got {router_kind!r}"
         )
     agentic_kind = os.environ.get("BETTER_CONTEXT_AGENTIC", "noop").lower()
     if agentic_kind == "gemini":

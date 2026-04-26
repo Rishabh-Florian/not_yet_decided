@@ -313,28 +313,26 @@ class GLiNER2EntityRouter:
                     "Install with `uv add gliner`, or switch to hosted mode by "
                     f"setting {self.MODEL_ID_ENV} + {self.API_KEY_ENV}."
                 ) from e
-            # Detect LoRA-only adapter directories (the format Pioneer ships
-            # weights as) and refuse with an actionable error. gliner 0.2.x
-            # lacks load_adapter; loading an adapter as a full model fails
-            # deep inside gliner with an opaque FileNotFoundError.
+            # Pioneer ships weights as LoRA adapters (adapter_config.json +
+            # adapter_weights.safetensors). gliner.from_pretrained can't load
+            # those directly — we detect the adapter shape here and apply it
+            # via peft on top of the base model in `_ensure_local_model`.
             assert path is not None
             import pathlib
             p = pathlib.Path(path)
-            adapter_marker = p / "adapter_config.json"
-            full_model_marker = p / "config.json"
-            if adapter_marker.is_file() and not full_model_marker.is_file():
-                raise RuntimeError(
-                    f"GLiNER2EntityRouter: {path!r} is a LoRA adapter directory, "
-                    f"not a full GLiNER2 model. The installed gliner package can't "
-                    f"load adapters directly. Switch to two-model hosted mode:\n"
-                    f"  BETTER_CONTEXT_ROUTER=two-model\n"
-                    f"  PIONEER_INTENT_MODEL_ID=<v2-model-id>\n"
-                    f"  PIONEER_NER_MODEL_ID=<v3-model-id>\n"
-                    f"  PIONEER_API_KEY=<your-key>\n"
-                    f"See pioneer/MODELS.md for the model ids and pioneer/README.md "
-                    f"for the full setup. Use BETTER_CONTEXT_ROUTER=stub to bypass "
-                    f"the model entirely (regex fallback)."
-                )
+            self._is_lora_adapter = (
+                (p / "adapter_config.json").is_file()
+                and not (p / "config.json").is_file()
+            )
+            if self._is_lora_adapter:
+                try:
+                    import peft  # type: ignore[import-not-found]  # noqa: F401
+                except ImportError as e:
+                    raise ImportError(
+                        f"{path!r} is a LoRA adapter — loading needs `peft` "
+                        "(installs with gliner already; if you removed it, "
+                        "run `uv add 'peft<0.19'`)."
+                    ) from e
         self._model_path = path
         self._model_id = endpoint
         self._api_key = api_key
@@ -343,11 +341,41 @@ class GLiNER2EntityRouter:
         self._model: object | None = None
         self._http_client: object | None = None
 
+    BASE_MODEL_ID: str = "fastino/gliner2-base-v1"
+
     def _ensure_local_model(self) -> object:
         if self._model is None:
             from gliner import GLiNER  # type: ignore[import-not-found]
-            assert self._model_path is not None  # __init__ guarantees one of path/endpoint
-            self._model = GLiNER.from_pretrained(self._model_path)
+            assert self._model_path is not None
+            if self._is_lora_adapter:
+                # Two-step: load base from HF, then apply LoRA adapter via peft.
+                # Pioneer's adapter targets the encoder submodule; gliner stores
+                # its torch model on the wrapper — find which attribute holds
+                # the nn.Module and wrap THAT in PeftModel.
+                from peft import PeftModel  # type: ignore[import-not-found]
+
+                base = GLiNER.from_pretrained(self.BASE_MODEL_ID)
+                attached = False
+                for attr in ("model", "encoder", "base_model", "net"):
+                    if hasattr(base, attr):
+                        sub = getattr(base, attr)
+                        import torch.nn as nn
+                        if isinstance(sub, nn.Module):
+                            setattr(base, attr, PeftModel.from_pretrained(sub, self._model_path))
+                            attached = True
+                            break
+                if not attached:
+                    raise RuntimeError(
+                        "Could not find a torch.nn.Module attribute on the "
+                        "base GLiNER wrapper to attach the LoRA adapter to. "
+                        "gliner's internal layout may have changed — switch "
+                        "to BETTER_CONTEXT_ROUTER=two-model (hosted) as a "
+                        "fallback."
+                    )
+                self._model = base
+            else:
+                # Full GLiNER2 model directory.
+                self._model = GLiNER.from_pretrained(self._model_path)
         return self._model
 
     def _ensure_http_client(self) -> object:
