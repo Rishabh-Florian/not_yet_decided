@@ -106,6 +106,7 @@ ingest_specs/       Per-tenant per-source MappingSpec YAMLs (reviewed + promoted
 scripts/            ingest_all.sh (bulk pipeline) + bootstrap_subgraph_nodes.py
 pioneer/            Fine-tuned GLiNER2 SLM weights + training pipeline + benchmark results
 docs/               ARCHITECTURE.md (full design) + DATASET.md
+harness/            Agent harness: PRINCIPLES, ddd-glossary, failure-modes, ralph/ autonomous loop, skills installer
 data/               Runtime SQLite db (gitignored)
 ```
 

@@ -53,7 +53,7 @@ Small steps: one test → one implementation → green → commit. Don't batch f
 
 ## 5. Domain-driven design (ubiquitous language)
 
-Names in code = names the user uses. If the user says "ticket", don't call it `Issue` in code. Maintain `docs/ddd-glossary.md` per project to keep terms aligned across PRD, code, UI copy, and commit messages.
+Names in code = names the user uses. If the user says "ticket", don't call it `Issue` in code. Maintain `harness/ddd-glossary.md` per project to keep terms aligned across PRD, code, UI copy, and commit messages.
 
 ## 6. No premature abstraction
 

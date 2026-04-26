@@ -47,7 +47,7 @@ Expanded version of the table in `CLAUDE.md`. Pattern: name the failure → name
 
 **Countermeasure**:
 - **Deep modules** (harness/PRINCIPLES.md §2). Fewer files, richer interfaces. Agent can fit the whole module in context.
-- Ubiquitous language (`docs/ddd-glossary.md`) — searches succeed because there's only one name per concept.
+- Ubiquitous language (`harness/ddd-glossary.md`) — searches succeed because there's only one name per concept.
 - `progress.txt` and `human-backlog.txt` — persistent cross-iteration memory the agent reads at the start of every Ralph loop iteration.
 
 ## 6. Agent silently fails / swallows errors

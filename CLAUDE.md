@@ -19,7 +19,8 @@ It is **not** a stack. Backend/frontend/styling/deploy are picked at hackathon T
 - `harness/ralph/` — autonomous loop kit. `ralph.sh <iterations>` runs the loop; `PROMPT.md` is its system prompt; `plans/` holds live state (`prd.json`, `progress.txt`, `human-backlog.txt`).
 - `recipes/` — markdown-only stack picks (backend, frontend, e2e-typesafety, styling, motion, demo, deploy). Pick combos, follow install commands.
 - `ci-templates/` — inert GitHub Actions YAML. Copy chosen ones into `.github/workflows/` once stack is decided.
-- `docs/` — extended philosophy reference: deep-modules, ddd-glossary, failure-modes.
+- `harness/` — agent harness: `PRINCIPLES.md`, `ddd-glossary.md`, `failure-modes.md`, `ralph/` autonomous loop, `skills-install.sh`.
+- `docs/` — product reference: ARCHITECTURE.md (full design) + DATASET.md.
 
 ## Two operating modes
 
@@ -32,7 +33,7 @@ It is **not** a stack. Backend/frontend/styling/deploy are picked at hackathon T
 - **Deep modules > shallow modules** (Ousterhout / Pocock). Prefer fewer files with rich interfaces hiding complexity over many files with narrow leaky interfaces. Future-you (limited context window) navigates deep modules better.
 - **End-to-end type safety**. Pydantic v2 schemas → OpenAPI → orval → TanStack Query hooks. CI fails on drift between backend schema and frontend client.
 - **TDD for non-trivial work**. Write the test first when the spec is clear. For UI polish / spikes, skip TDD.
-- **DDD / ubiquitous language**. Names in code = names the user uses. Don't invent synonyms. See `docs/ddd-glossary.md` once one exists for the project.
+- **DDD / ubiquitous language**. Names in code = names the user uses. Don't invent synonyms. See `harness/ddd-glossary.md` once one exists for the project.
 - **No premature abstraction**. Three similar lines beats a wrong abstraction. Don't add config knobs for hypothetical needs.
 - **No emojis in code/files** unless explicitly requested.
 
