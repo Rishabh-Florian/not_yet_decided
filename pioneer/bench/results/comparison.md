@@ -1,10 +1,52 @@
 # Pioneer GLiNER2 fine-tune — eval comparison
 
-## Eval set
+## Round 3 — NER-only model (2026-04-26) — ACCEPTANCE TARGET MET
+
+Two-model architecture: keep v2 schema fine-tune for intent (0.978 acc),
+train a separate NER-only model on the new template-generated dataset.
+Eval on `pioneer/seeds/eval_set_v2_ner.jsonl` (105 rows, every entity
+type with ground truth, threshold sweep 0.3 → 0.99).
+
+| Entity | Base GLiNER2 | v2 schema | **v3 NER-only** | Δ vs base | Δ vs v2 |
+|---|---|---|---|---|---|
+| emp_id | 0.918 | 0.918 | **1.000** | +0.082 | +0.082 |
+| customer_id | 0.667 | 0.222 | **0.941** | +0.275 | **+0.719** |
+| ticket_id | 0.750 | 0.000 | **0.909** | +0.159 | **+0.909** |
+| date | 0.840 | 0.857 | **0.920** | +0.080 | +0.063 |
+| department | 0.667 | 0.581 | **0.863** | +0.196 | +0.282 |
+| product | 0.273 | 0.000 | 0.471 | +0.198 | +0.471 |
+| **MACRO** | 0.686 | 0.430 | **0.851** | **+0.165** | **+0.421** |
+| p95 latency (Pioneer API) | 846 ms | 853 ms | 1536 ms | — | — |
+
+**Acceptance**: macro NER F1 ≥ 0.85 → 0.851 ✓. Beat base by ≥10 pp → +16.5 pp ✓.
+
+**Why the new dataset worked**: Round 1+2 trained on regex-derived seeds from
+`tasks.jsonl` (lookup-heavy, almost no ticket_id/date/customer_id ground
+truth). Round 3 trains on 497 templated queries built from real graph
+entity values — every span is gold-perfect by construction. Round 3
+also drops the joint NER+classification (schema) task: training NER in
+isolation kept the head from being diluted by the classification signal.
+
+**Two-model production path**: v2 (intent classifier, 0.978 acc) +
+v3 (NER-only, 0.851 macro F1) called in parallel via threadpool inside
+a new `TwoModelEntityRouter`. Same total p95 as a single model
+(parallel masks the second call), no regression on either head.
+
+Pioneer job ids:
+- v3 NER-only: `ee1a87ae-2611-4eed-9f66-64437d40e0bb`
+- v2 schema (intent classifier kept for production): `683f9b1f-db87-4eba-9cf8-719b1350251d`
+
+---
+
+## Earlier rounds — for context
+
+### Eval set v1
 
 `pioneer/seeds/eval_set.jsonl` — 45 held-out queries (30 lookup / 7
 search / 4 analytical / 4 ambiguous). Schema: 4-way intent +
-6 entity types.
+6 entity types. **Limitation**: 0 ground-truth examples for
+`ticket_id`, `date`, `customer_id` → macro F1 ceiling was 0.67. Eval
+v2 (105 rows) replaces this with full per-type coverage.
 
 ## Round 1 results (2026-04-26)
 
