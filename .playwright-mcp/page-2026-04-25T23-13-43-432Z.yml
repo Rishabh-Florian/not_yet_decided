@@ -1,0 +1,9 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic:
+      - heading "Your company's memory. Made legible." [level=1]
+      - paragraph: Turn fragmented data into a knowledge graph AI can operate on — with fact-level provenance tracing every claim to its source.
+      - button "Explore the graph" [ref=e5] [cursor=pointer]:
+        - text: Explore the graph
+        - img [ref=e6]
+  - alert [ref=e8]
