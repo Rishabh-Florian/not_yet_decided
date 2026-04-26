@@ -53,9 +53,10 @@ above, the cascade still works using stub fallbacks at each tier.
 
 ```
 backend/        Python: graph store + adaptive ingestion + REST API + retrieval cascade + workflows + eval
-frontend/       Next.js + React UI (not yet scaffolded)
+frontend/       Next.js 14 + React UI (live — graph viz, node browser, query, edit, provenance)
 dataset/        EnterpriseBench source data (sample tenant)
 ingest_specs/   per-tenant per-source MappingSpec YAMLs
+scripts/        ingest_all.sh (bulk onboard + ingest) + bootstrap_subgraph_nodes.py
 docs/           ARCHITECTURE.md + DATASET.md
 data/           runtime SQLite db (gitignored)
 ```
@@ -104,7 +105,15 @@ data/           runtime SQLite db (gitignored)
   from `tasks.jsonl`, runs the cascade, reports recall@5/@10, p50/p95
   latency, per-tier termination, escalation rate. Output Markdown to
   `backend/eval/reports/<UTC-timestamp>.md`.
-- **299 passing tests** -- ingest agnosticism, pattern-query/edit,
+- **Frontend (Next.js 14 + React)** -- fully live at `http://localhost:3000`.
+  Four views: `/app/graph` (force-directed graph with department/node-type/edge
+  filter panel), `/app/nodes` (paginated node browser + detail panel with
+  provenance timeline + raw-record drawer), `/app/query` (pattern DSL query
+  UI), `/app/edit/:id` (inline node editor with human-provenance tracking).
+  Home page chatbar calls `POST /api/query` with rotating prompt chips and
+  live tier/relevance/latency result cards. VFS tree sidebar on every app
+  page. Topbar shows live node + edge counts from `GET /api/graph/stats`.
+- **331 passing tests** -- ingest agnosticism, pattern-query/edit,
   per-tier retrieval (exact/hybrid/router/agentic/orchestrator), tools,
   workflow framework + 2 concrete workflows, API integration.
 
@@ -112,11 +121,9 @@ data/           runtime SQLite db (gitignored)
 
 | Feature | Why it matters | Effort estimate |
 |---------|---------------|-----------------|
-| VFS API (`ls`, `cat`, `grep`, `find`, `stat`, `tree`) | Lets AI agents browse the knowledge graph as a file system | Medium -- Cypher queries over `vfs_path`, no disk writes |
 | Cross-encoder rerank on retrieval cascade | Sharpens top-k ordering after RRF fusion | Small -- one model call after HybridTier emits, before relevance scoring |
 | Conflict resolution engine + UI | Auto-resolve known conflict types, queue ambiguous ones for humans | Large -- rule engine + LLM triage + resolution API + UI |
 | MCP server | Claude-native tool interface over the API | Small -- thin wrappers around existing endpoints |
-| Web UI (React + Next.js) | Human browse, search, edit, resolve conflicts | Large -- VFS tree, content viewer, graph viz, conflict queue |
 
 See the full flow-by-flow status in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 

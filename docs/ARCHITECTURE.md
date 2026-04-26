@@ -23,7 +23,7 @@
 > | Workflow API (frozen-policy retrieval) | **done** | R5a framework + R5b `answer-customer-email` + R5c `thread-summary`. `GET/POST /api/workflow{,/{name}}`. Built-ins registered explicitly at FastAPI startup via `register_builtin_workflows()` (no import-side-effect). |
 > | Conflict resolution engine + UI | not yet | Rule-based + LLM triage designed, not implemented |
 > | MCP server (for Claude / AI agents) | not yet | MCP tool wrappers over existing API |
-> | Web UI (React + Next.js) | not yet | No frontend code |
+> | Web UI (React + Next.js) | **done** | Next.js 14 + React. Four app views: `/app/graph` (force-directed graph + filter panel), `/app/nodes` (node browser + provenance timeline + raw-record drawer), `/app/query` (pattern DSL), `/app/edit/:id` (inline edit with human-provenance tracking). Home page chatbar hits `POST /api/query`. VFS tree sidebar throughout. Topbar live stats from `/api/graph/stats`. |
 > | ~~VFS materialization to disk~~ | dropped | Not needed: raw records are already verbatim in `source_records`. VFS is a query-time lens, not a stored projection. |
 > | ~~Per-node `vfs_path` column~~ | dropped | The original design stamped a path on every node at ingest. Implementation chose a simpler shape: the path is **derived** from `(canonical_type, node_id)` at request time, no ingestion change. The `vfs_path` column on `:Entity` is unused (kept for now to avoid a Neo4j schema migration). |
 > | ~~ChromaDB / external vector index~~ | dropped | Replaced by Neo4j native vector indexes (5.13+, HNSW). Embeddings live on `:Entity` nodes; one database, no sync. |
@@ -34,7 +34,7 @@
 > |------|-------------|--------|----------------|----------------|
 > | **Flow 1** | AI Agent Retrieves Context (VFS browse) | **done** (agent path) | Six VFS tools (`vfs_ls`/`vfs_cat`/`vfs_grep`/`vfs_find`/`vfs_stat`/`vfs_tree`) wired into `backend/retrieval/tools.py`; AgenticTier picks among them in its function-calling loop. No REST endpoints (frontend doesn't consume them) | MCP wrapper |
 > | **Flow 2** | AI Agent Answers Complex Question (pattern query) | **done** | `POST /api/graph/query` returns typed pattern matches with provenance; `vfs_cat` enriches a candidate node with full attributes + grouped neighbors + linked raw records in one call | — |
-> | **Flow 3** | Human Browses Company Memory (web UI) | not yet | — | Frontend (React + Next.js), graph visualization |
+> | **Flow 3** | Human Browses Company Memory (web UI) | **done** | `/app/graph` force-directed graph (3-axis filter panel: department, node type, edge type), `/app/nodes` paginated browser + detail panel, `/app/query` pattern DSL, VFS tree sidebar | — |
 > | **Flow 4** | Human Resolves Conflict (conflict queue) | not yet | — | Conflict detection engine, resolution API, queue UI |
 > | **Flow 5** | Human Edits Company Memory (edit + provenance) | **done** | `PUT /api/graph/node/{id}` with synthetic source records, per-attribute human provenance, version bumps | — |
 
@@ -119,7 +119,7 @@ The system ingests the Inazuma.co EnterpriseBench dataset (~50K records across 1
 | **Backend API** | Python 3.11 + FastAPI | Fast to build, async, great ecosystem for data/AI |
 | **Knowledge Graph + Vector Search** | Neo4j 5.13+ (graph + native HNSW vector index) + SQLite (provenance, raw records, ingestion control plane) | One database for graph and embeddings — no separate vector store to sync. ChromaDB removed. |
 | **LLM** | Claude API (claude-sonnet-4-6) | Entity extraction, conflict resolution, summarization |
-| **Frontend** | Next.js 14 + React + Tailwind + shadcn/ui | Fast to prototype, good file-tree components |
+| **Frontend** | Next.js 14 + React + Tailwind + shadcn/ui + framer-motion | Four live views: force-directed graph (react-force-graph-2d) with filter panel, node browser with provenance timeline, pattern query UI, inline node editor. Home page chatbar wired to `POST /api/query`. |
 | **VFS** | Query-time lens over canonical types — `backend/vfs/operations.py` translates `/{Type}/{node_id}` paths into Cypher reads. Two-level tree, derived from `CANONICAL_NODE_TYPES`. No stored `vfs_path`, no markdown files on disk. | Raw records already verbatim in `source_records`; the canonical-type tree generalizes to any new type with zero VFS code change (just edit `canonical.yaml`). |
 | **PDF Parsing** | PyMuPDF (fitz) | Fast, reliable PDF text extraction |
 | **Data Parsing** | pandas + orjson | High-performance JSON/CSV handling |
@@ -349,7 +349,8 @@ backend/
   test_graph_query_edit.py   pattern query DSL + edit API tests (24 tests: parser, integration, endpoint)
 ingest_specs/
   enterprisebench/
-    emails.yaml              hand-written reference spec
+    emails.yaml              hand-written reference spec (few-shot example for Onboarder)
+    employees.yaml           MappingSpec for HR employees (Person nodes, REPORTS_TO edges)
 ```
 
 ### Honest scope: covered formats vs. shim-required
@@ -671,29 +672,23 @@ on the `:Entity` / edge level are caller-defined ("all `exact`", "any
 Retrieval relevance (cosine similarity, BM25, rerank score) is a separate
 concept and lives on retrieval result objects, not on `Provenance`.
 
-**Graph statistics (estimated for this dataset):**
+**Graph statistics (live — emails + employees ingested as of 2026-04-26):**
 
 | Metric | Count |
 |---|---|
-| Total nodes | ~19,000 |
-| — Employee | 1,260 |
-| — Customer | 90 |
-| — Product | 1,351 |
-| — Client | 400 |
-| — Vendor | 400 |
-| — EmailThread | 4,417 |
-| — Email | 11,928 |
-| — Conversation | 2,897 |
-| — ITTicket | 163 |
-| — Repository | 726 |
-| — Policy | 24 |
-| — SocialPost | 971 |
-| — Department | 8 |
-| — Category (product) | ~50 |
-| — Skill | ~200 |
-| — Topic | ~100 |
-| Total edges | ~80,000+ |
-| Provenance records | ~150,000+ |
+| Total nodes | 13,201 |
+| — Person (employees) | 1,260 |
+| — Message (emails) | 11,928 |
+| — Organization (departments + locations, bootstrapped) | 13 |
+| Total edges | 26,937 |
+| — SENT | 11,928 |
+| — RECEIVED | 11,928 |
+| — REPORTS_TO | 1,208 |
+| — MEMBER_OF | 1,873 |
+| Provenance records | 200,907 |
+
+> Full dataset (customers, products, sales, tickets, repos, etc.) pending
+> additional ingest runs via `bash scripts/ingest_all.sh`.
 
 ---
 
@@ -1573,51 +1568,74 @@ def search(query: str, scope: str, top_k: int) -> list[dict]: ...
 
 ---
 
-## Web UI Design
+## Web UI
 
-### Layout
+> **Implementation status (2026-04-26).** The frontend is live at
+> `http://localhost:3000`. The original wireframe described a three-panel
+> layout with a VFS tree, content viewer, and graph viz. The shipped UI
+> diverges from that sketch in some ways (no conflict queue yet, no
+> version history diff view) but adds things not in the original design
+> (home page chatbar, provenance timeline, raw-record drawer). What ships:
+
+### App routes (`/app/*`)
+
+| Route | Component | What it does |
+|---|---|---|
+| `/app/graph` | `GraphView` + `FilterPanel` | Force-directed graph (`react-force-graph-2d`). 3-axis filter panel: department, node type, edge/relation type. Click a node to see its id + attributes. Live node/edge counts in topbar. |
+| `/app/nodes` | `NodeListTable` + `NodeDetailPanel` | Paginated node browser (`GET /api/graph/nodes?type=…`). Select a row → detail panel with full attributes, `ProvenanceTimeline` (per-field extraction history), `SourceRecordDrawer` (raw JSON from layer 4 via `GET /api/source/…`). |
+| `/app/query` | `QueryView` | Pattern query UI (`POST /api/graph/query`). Type a DSL pattern like `(Person)-[SENT]->(Message)`, get paginated triples with provenance. |
+| `/app/edit/:id` | `EditForm` | Inline node editor. Calls `PUT /api/graph/node/:id` with changed attributes + editor identity. On save, provenance is recorded as `extraction_method="human"`. |
+| `/` (home) | `HomePage` | Landing page with animated sphere, rotating prompt chips, chatbar wired to `POST /api/query`. Returns tier used, relevance score, latency, and top-3 hit cards. "Explore the graph" navigates to `/app/graph`. |
+
+### Shared shell
+
+- **`TopBar`** — live `node_count · edge_count` from `GET /api/graph/stats`. Nav links to Graph / Nodes / Query. GitGraph favicon via `icon.svg`.
+- **`VfsTree`** — sidebar on all `/app` pages. Shows canonical type hierarchy from the VFS path tree; click to navigate.
+- **`LeftFilterPanelMount`** — mounts `FilterPanel` on the graph page only.
+- **`ProvenancePanel`** — slide-in panel showing the provenance chain for a selected node/edge.
+
+### Frontend layout (files)
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│  Better Context              🔍 Search...         [Conflicts: 3] │
-├──────────────┬───────────────────────────────────┬───────────────┤
-│              │                                   │               │
-│  VFS Tree    │        Main Content               │  Graph View   │
-│              │                                   │               │
-│  ▼ company   │  # Raj Patel                      │   ┌───┐       │
-│    ▼ people  │                                   │   │Raj├──┐    │
-│      ▶ eng   │  **Department:** Engineering      │   └───┘  │    │
-│      ▶ hr    │  **Level:** EN14 (Senior)         │      ┌───▼┐   │
-│      ▶ sales │  **Email:** raj.patel@inazuma.com │      │Eng │   │
-│    ▶ custom. │                                   │      └────┘   │
-│    ▶ product │  ## Skills                        │               │
-│    ▶ business│  Python, ML, System Design        │  ┌────┐       │
-│    ▶ comms   │                                   │  │emp1├──┐    │
-│    ▶ it      │  ## Recent Activity               │  └────┘  │    │
-│    ▶ policies│  - 47 email threads               │      ┌───▼┐   │
-│    ▶ process │  - 12 conversations               │      │Raj │   │
-│    ▶ traject │  - 2 repositories                 │      └────┘   │
-│    ▶ _meta   │                                   │               │
-│              │  ## Sources                        │               │
-│              │  📄 employees.json (emp_0431)      │               │
-│              │  📄 resume_info.csv (emp_0431)     │               │
-│              │                                   │               │
-│              │  [Edit] [History] [Raw JSON]       │               │
-│              │                                   │               │
-├──────────────┴───────────────────────────────────┴───────────────┤
-│  Provenance trail: employees.json:emp_0431 → extracted 2026-... │
-└──────────────────────────────────────────────────────────────────┘
+frontend/src/
+├── app/
+│   ├── page.tsx                  Home page (chatbar + hero)
+│   ├── layout.tsx                Root layout + metadata + favicon
+│   ├── icon.svg                  GitGraph favicon (accent purple)
+│   └── app/
+│       ├── layout.tsx            App shell: TopBar + VfsTree sidebar
+│       ├── graph/page.tsx        Graph view
+│       ├── nodes/page.tsx        Node list
+│       ├── nodes/[id]/page.tsx   Node detail
+│       ├── query/page.tsx        Pattern query
+│       └── edit/[id]/page.tsx    Node editor
+├── components/
+│   ├── graph/
+│   │   ├── GraphView.tsx         react-force-graph-2d wrapper
+│   │   ├── FilterPanel.tsx       Department / node-type / edge-type filters
+│   │   ├── graph-data.ts         Graph data fetching + shape
+│   │   └── useFilteredGraph.ts   Filter state → filtered nodes/edges
+│   ├── nodes/
+│   │   ├── NodeListTable.tsx     Paginated node browser
+│   │   └── NodeDetailPanel.tsx   Attributes + provenance + source drawer
+│   ├── provenance/
+│   │   ├── ProvenanceTimeline.tsx  Per-field extraction history
+│   │   ├── SourceRecordDrawer.tsx  Raw JSON from layer 4
+│   │   └── ConfidencePill.tsx
+│   ├── query/
+│   │   └── QueryView.tsx         Pattern DSL query form + results table
+│   ├── edit/
+│   │   └── EditForm.tsx          Node attribute editor
+│   ├── shell/
+│   │   ├── TopBar.tsx            Global nav + live stats
+│   │   ├── VfsTree.tsx           VFS sidebar
+│   │   ├── LeftFilterPanelMount.tsx
+│   │   └── ProvenancePanel.tsx
+│   └── hero/
+│       └── ScrollSphere.tsx      Animated sphere on landing page
+└── store/
+    └── filter-store.ts           Zustand filter state
 ```
-
-### Key UI Features
-
-1. **Left panel: VFS tree navigator** — collapsible folder tree, file icons by type, badge counts
-2. **Center panel: Content viewer/editor** — renders markdown with frontmatter, inline edit mode, diff view for version history
-3. **Right panel: Graph neighborhood** — interactive force-directed graph showing the current entity's relationships (clickable nodes navigate the VFS)
-4. **Top bar: Global search** — hybrid search across all VFS files, graph entities, and raw sources
-5. **Conflict queue** — badge shows pending conflicts, click to open resolution UI (side-by-side comparison with "Accept A / Accept B / Merge" buttons)
-6. **Provenance footer** — every page shows the source chain: which files, which fields, which extraction method, when
-7. **History view** — version timeline for any file, showing what changed and why (human edit vs. source update)
 
 ---
 
