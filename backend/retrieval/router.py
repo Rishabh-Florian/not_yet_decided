@@ -313,6 +313,28 @@ class GLiNER2EntityRouter:
                     "Install with `uv add gliner`, or switch to hosted mode by "
                     f"setting {self.MODEL_ID_ENV} + {self.API_KEY_ENV}."
                 ) from e
+            # Detect LoRA-only adapter directories (the format Pioneer ships
+            # weights as) and refuse with an actionable error. gliner 0.2.x
+            # lacks load_adapter; loading an adapter as a full model fails
+            # deep inside gliner with an opaque FileNotFoundError.
+            assert path is not None
+            import pathlib
+            p = pathlib.Path(path)
+            adapter_marker = p / "adapter_config.json"
+            full_model_marker = p / "config.json"
+            if adapter_marker.is_file() and not full_model_marker.is_file():
+                raise RuntimeError(
+                    f"GLiNER2EntityRouter: {path!r} is a LoRA adapter directory, "
+                    f"not a full GLiNER2 model. The installed gliner package can't "
+                    f"load adapters directly. Switch to two-model hosted mode:\n"
+                    f"  BETTER_CONTEXT_ROUTER=two-model\n"
+                    f"  PIONEER_INTENT_MODEL_ID=<v2-model-id>\n"
+                    f"  PIONEER_NER_MODEL_ID=<v3-model-id>\n"
+                    f"  PIONEER_API_KEY=<your-key>\n"
+                    f"See pioneer/MODELS.md for the model ids and pioneer/README.md "
+                    f"for the full setup. Use BETTER_CONTEXT_ROUTER=stub to bypass "
+                    f"the model entirely (regex fallback)."
+                )
         self._model_path = path
         self._model_id = endpoint
         self._api_key = api_key
