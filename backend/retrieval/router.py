@@ -610,57 +610,86 @@ class TwoModelEntityRouter:
                 f"Pioneer inference HTTP {resp.status_code}: {resp.text[:200]}"
             )
         body = resp.json()
-        # Pioneer wraps the prediction either at top level or under `result`.
+        # Pioneer wraps the prediction in OpenAI chat-completion shape:
+        # body["choices"][0]["message"]["content"] is a JSON string.
+        if isinstance(body, dict) and "choices" in body:
+            import json as _json
+            content = body["choices"][0]["message"]["content"]
+            return _json.loads(content) if isinstance(content, str) else content  # type: ignore[no-any-return]
+        # Older API path: prediction at top level or under `result`.
         return body.get("result", body) if isinstance(body, dict) else body  # type: ignore[no-any-return]
 
+    def _parse_intent_label(self, raw_intent: object) -> RouterIntent:
+        # Pioneer returns intent either as a string (old) or
+        # {"label": "...", "confidence": 0.99}. Handle both.
+        if isinstance(raw_intent, dict):
+            label = raw_intent.get("label")
+        else:
+            label = raw_intent
+        if label not in INTENTS:
+            raise RuntimeError(
+                f"Intent model returned unknown intent {label!r}; "
+                f"expected one of {INTENTS}"
+            )
+        return label  # type: ignore[return-value]
+
+    def _parse_entities(self, raw_entities: object) -> dict[str, list[str]]:
+        # Pioneer returns entities as a dict-of-lists. Each list element is
+        # either a plain string (old) or {"text": "...", "confidence": ...,
+        # "start": int, "end": int} (current). Extract just the text spans.
+        if not isinstance(raw_entities, dict):
+            return {}
+        spans: dict[str, list[str]] = {}
+        for etype, vals in raw_entities.items():
+            if etype not in ENTITY_TYPES:
+                continue
+            if not isinstance(vals, list):
+                continue
+            clean: list[str] = []
+            for v in vals:
+                if isinstance(v, str) and v:
+                    clean.append(v)
+                elif isinstance(v, dict):
+                    text = v.get("text")
+                    if isinstance(text, str) and text:
+                        clean.append(text)
+            if clean:
+                spans[etype] = clean
+        return spans
+
     def _classify_intent(self, query: str) -> tuple[RouterIntent, float]:
-        """Call Pioneer hosted intent model. v2 schema returns
-        ``{"intent": "<label>", "entities": {...}}`` — we keep only the
-        intent and discard its NER (v3 below produces better NER)."""
+        """Call Pioneer hosted intent model. Returns intent + confidence."""
         raw = self._call_pioneer({
             "model": self._intent_model_id,
+            "messages": [{"role": "user", "content": query}],
             "task": "schema",
-            "input": query,
             "schema": {
                 "entities": list(ENTITY_TYPES),
                 "classifications": {"intent": list(INTENTS)},
             },
             "threshold": self._intent_threshold,
         })
-        intent = raw.get("intent")
-        if intent not in INTENTS:
-            raise RuntimeError(
-                f"Intent model returned unknown intent {intent!r}; "
-                f"expected one of {INTENTS}"
-            )
-        # Hosted API has already applied threshold; treat as fully confident.
-        return intent, 1.0  # type: ignore[return-value]
+        intent = self._parse_intent_label(raw.get("intent"))
+        # If model returned confidence, surface it; otherwise the API has
+        # already applied its threshold so we treat as fully confident.
+        intent_obj = raw.get("intent")
+        confidence = 1.0
+        if isinstance(intent_obj, dict):
+            c = intent_obj.get("confidence")
+            if isinstance(c, (int, float)):
+                confidence = float(c)
+        return intent, confidence
 
     def _extract_entities(self, query: str) -> dict[str, list[str]]:
-        """Call Pioneer hosted NER model. v3 NER-only returns
-        ``{"entities": {"<type>": [<spans>], ...}}``."""
+        """Call Pioneer hosted NER model."""
         raw = self._call_pioneer({
             "model": self._ner_model_id,
+            "messages": [{"role": "user", "content": query}],
             "task": "extract_entities",
-            "input": query,
             "schema": list(ENTITY_TYPES),
             "threshold": self._ner_threshold,
         })
-        entities_raw = raw.get("entities", raw)
-        if not isinstance(entities_raw, dict):
-            raise RuntimeError(
-                f"NER model returned non-dict entities: {type(entities_raw).__name__}"
-            )
-        spans: dict[str, list[str]] = {}
-        for etype, vals in entities_raw.items():
-            if etype not in ENTITY_TYPES:
-                continue
-            if not isinstance(vals, list):
-                raise RuntimeError(f"NER entities[{etype!r}] must be a list")
-            clean = [v for v in vals if isinstance(v, str) and v]
-            if clean:
-                spans[etype] = clean
-        return spans
+        return self._parse_entities(raw.get("entities", raw))
 
     def classify(self, query: str) -> RouterDecision:
         if not isinstance(query, str):
