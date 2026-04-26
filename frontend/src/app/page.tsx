@@ -71,7 +71,7 @@ export default function HomePage() {
     try {
       const data = await apiPost<QueryResult>("/api/query", {
         query: trimmed,
-        context: { max_latency_ms: 500 },
+        context: { max_latency_ms: 30000 },
       });
       setResult(data);
     } catch (err) {
