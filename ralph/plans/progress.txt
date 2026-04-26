@@ -61,4 +61,14 @@
 - Pioneer.ai fine-tune logged in human-backlog.txt (12 steps, full materials prepared).
 - Next: #5 (R3 AgenticTier - Gemini).
 
+### 2026-04-26 — #5 done (R3 AgenticTier - Gemini function-calling)
+- backend/retrieval/agentic.py: AgenticTier(store, embedder, llm, *, max_iterations=6, wall_clock_budget_ms=10_000). LLMClient ABC + LLMTurn/ToolCall/ToolResult dataclasses. StubLLMClient (scripted, tests), NoopLLMClient (no-key default), GeminiLLMClient (lazy google-genai, raises if GEMINI_API_KEY unset).
+- backend/retrieval/tools.py: ToolBox with 6 tools — pattern_query (typed DSL via parse_pattern, no free Cypher), fulltext_search, vector_search, get_node, get_neighbors, get_source_record. CitationCollector dedups on (source_file, source_record_id, source_field). Per-tool size caps: _MAX_K=25, _MAX_DEPTH=3, _MAX_NEIGHBORS=50.
+- Cascade: [exact, router, hybrid, agentic, stub] — agentic between hybrid and stub; router's route_to="agentic" lands here.
+- Algorithmic relevance (per #10): RELEVANCE_GROUNDED=0.7 (final answer + ≥1 citation), RELEVANCE_UNGROUNDED=0.3 (answer no citations), RELEVANCE_FAILED=0.0 (timeout/overshoot/exception). NOT agent self-rating.
+- Env: QONTEXT_AGENTIC=gemini|noop (default noop).
+- Verifiers: ruff clean, pyright 0 errors, pytest 242 passed / 16 skipped.
+- Human-backlog: GEMINI_API_KEY + QONTEXT_AGENTIC=gemini setup checklist.
+- All 4 tiers + 1 stub now wired. Next: #7 (R5a Workflow framework).
+
 ---

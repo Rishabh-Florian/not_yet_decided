@@ -19,7 +19,7 @@
 > | REST API — Graph pattern query | **done** | `POST /api/graph/query` — typed pattern DSL |
 > | REST API — Edit API (human-in-the-loop) | **done** | `PUT /api/graph/node/{id}` — provenance-tracked edits |
 > | VFS API (ls, cat, grep, find, stat, tree) | not yet | VFS is a logical view (no disk materialization) — endpoints not built |
-> | Search API (semantic + hybrid, Neo4j HNSW) | partial | R0/R1/R2/R4 tiers landed (cascade + Cypher/fulltext + vector+RRF + Pioneer.ai GLiNER2 pre-router behind a Protocol with stub fallback). Cross-encoder rerank and R3 agentic tier still pending. Embedding population (`backend/retrieval/embed.py`) is a manual one-shot pass. |
+> | Search API (semantic + hybrid, Neo4j HNSW) | partial | R0/R1/R2/R3/R4 tiers landed (cascade + Cypher/fulltext + vector+RRF + Pioneer.ai GLiNER2 pre-router + bounded Gemini function-calling agentic tier; LLM client behind a Protocol with stub/noop fallback). Cross-encoder rerank still pending. Embedding population (`backend/retrieval/embed.py`) is a manual one-shot pass. |
 > | Conflict resolution engine + UI | not yet | Rule-based + LLM triage designed, not implemented |
 > | MCP server (for Claude / AI agents) | not yet | MCP tool wrappers over existing API |
 > | Web UI (React + Next.js) | not yet | No frontend code |
@@ -1163,7 +1163,7 @@ GET  /api/vfs/stat?path=/company/people/eng/...   # File metadata (provenance, v
 GET  /api/vfs/tree?path=/company/&depth=2         # Directory tree
 ```
 
-### Search API (hybrid retrieval) -- PARTIAL (R0/R1/R2/R4 landed; R3 agentic pending)
+### Search API (hybrid retrieval) -- LANDED (R0/R1/R2/R3/R4)
 
 The retrieval surface is a **single endpoint** backed by a cascade
 orchestrator. Callers POST a query, the orchestrator walks the
@@ -1198,14 +1198,18 @@ Each tier documents which algorithm it uses on its `Hit.score` and
 | `exact` | LANDED (R1) | Cypher exact id match + Neo4j fulltext (`node_text`, BM25-similar normalized to [0,1)) | #3 |
 | `router` | LANDED (R4) | Pioneer.ai GLiNER2 multi-task (intent classification + NER) — pre-routes to T1 (lookup), T3 (search), or T4 (analytical); abstains otherwise | #6 |
 | `hybrid` | LANDED (R2) | Neo4j HNSW vector + fulltext (`node_text`) fused by Reciprocal Rank Fusion (k=60), normalized by max possible RRF | #4 |
-| `agentic` | pending (R3) | Gemini function-calling over store ops | #5 |
+| `agentic` | LANDED (R3) | Bounded Gemini function-calling loop (max 6 calls, 10s wall-clock); algorithmic relevance ∈ {0.0 failed, 0.3 ungrounded, 0.7 grounded ≥1 citation} | #5 |
 | `stub` | LANDED (R0) | always returns 0 hits, relevance 0.0 (terminal fallback) | #2 |
 
-**Default cascade order:** `[exact, router, hybrid, stub]`. Production
-factory `build_orchestrator_with_store(store)` wires this. Router sits
-between exact and hybrid: pure id queries (`emp_1002`) hit the cheap
-ExactTier regex first; only on a miss does the GLiNER2 pre-route fire,
-adding NER recall on natural-language queries.
+**Default cascade order:** `[exact, router, hybrid, agentic, stub]`.
+Production factory `build_orchestrator_with_store(store)` wires this.
+Router sits between exact and hybrid: pure id queries (`emp_1002`)
+hit the cheap ExactTier regex first; only on a miss does the GLiNER2
+pre-route fire, adding NER recall on natural-language queries.
+Agentic sits after hybrid because its 10s wall-clock budget makes it
+the most expensive tier — the intended entry path is the router's
+`route_to="agentic"` directive on `analytical` intent (multi-hop
+queries), not cascade fallthrough.
 
 **Pre-route directive.** A tier may set `QueryResult.route_to=<tier>`
 to skip the cascade ahead. Honored at most once per query so a router
@@ -1228,6 +1232,29 @@ cascade up-front.
   `QONTEXT_ROUTER=gliner2`. Requires `uv add gliner` and the
   Pioneer.ai fine-tune (see
   `backend/retrieval/router_train/README.md`).
+
+**AgenticTier backend.** Hidden behind the `LLMClient` Protocol
+(mirrors how `Embedder` and `EntityRouter` are isolated):
+- `NoopLLMClient` (default) — single fixed marker text; the cascade
+  returns a typed result on the rare fallthrough path but escalates
+  past to `stub` (relevance 0.3 < 0.5 floor). No network.
+- `StubLLMClient` (tests) — scripted `LLMTurn` list, deterministic;
+  used to exercise the loop driver, iteration cap, tool-error
+  passthrough, and grounded/ungrounded scoring without calling out.
+- `GeminiLLMClient` (production) — `gemini-2.5-flash` via
+  `google-genai`. Fail-fast on missing `GEMINI_API_KEY`. Selected by
+  `QONTEXT_AGENTIC=gemini`. Six tools surfaced via
+  `function_declarations`: `pattern_query` (typed DSL — wraps
+  `GraphStore.pattern_query` and validates against the canonical
+  registry; no free-form Cypher), `fulltext_search`, `vector_search`,
+  `get_node`, `get_neighbors`, `get_source_record`. Tool errors
+  surface back to the model as the next-turn function-response
+  payload (no crash). `Hit.score`/`relevance` are algorithmic, NOT
+  the agent's self-rating: 0.7 if final answer + ≥1 unique citation,
+  0.3 if answer + 0 citations, 0.0 on overshoot/timeout/exception.
+  Citations are deduplicated on `(source_file, source_record_id,
+  source_field)` so the score reflects unique evidence, not call
+  count.
 
 **Eval harness** (`backend/eval/`):
 

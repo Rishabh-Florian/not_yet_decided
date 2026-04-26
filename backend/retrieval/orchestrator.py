@@ -186,13 +186,14 @@ def build_default_orchestrator(tiers: list[Tier]) -> CascadeOrchestrator:
 
 
 def build_orchestrator_with_store(store: object) -> CascadeOrchestrator:
-    """Production cascade for `POST /api/query`: `[ExactTier, RouterTier, HybridTier, StubTier]`.
+    """Production cascade for `POST /api/query`: `[ExactTier, RouterTier, HybridTier, AgenticTier, StubTier]`.
 
     Tier order:
-      1. `exact`  — Cypher id lookup + Neo4j fulltext (R1, issue #3)
-      2. `router` — Pioneer.ai GLiNER2 pre-route (R4, issue #6)
-      3. `hybrid` — vector + fulltext fused by RRF (R2, issue #4)
-      4. `stub`   — terminal no-op so the cascade always returns a result
+      1. `exact`   — Cypher id lookup + Neo4j fulltext (R1, issue #3)
+      2. `router`  — Pioneer.ai GLiNER2 pre-route (R4, issue #6)
+      3. `hybrid`  — vector + fulltext fused by RRF (R2, issue #4)
+      4. `agentic` — Gemini function-calling loop (R3, issue #5)
+      5. `stub`    — terminal no-op so the cascade always returns a result
 
     Why is `router` after `exact`? Pure id queries (`emp_1002`) are
     already caught by ExactTier's regex; running an NER model on them
@@ -202,6 +203,16 @@ def build_orchestrator_with_store(store: object) -> CascadeOrchestrator:
     router runs, may extract an id ExactTier missed, and either
     delegates back to ExactTier inline (`lookup` intent) or emits a
     `route_to` directive that skips the cascade ahead.
+
+    Why is `agentic` after `hybrid`? AgenticTier's wall-clock budget
+    is 10s — an order of magnitude more expensive than every other
+    tier. Cascade fallthrough to it is a last-resort path; the
+    intended entry is the router's `route_to="agentic"` directive on
+    `analytical` intent (multi-hop reasoning queries). The
+    orchestrator's pre-route mechanism honors that directive and
+    jumps `hybrid` for analytical queries, so `agentic` only runs
+    after `hybrid` for queries that the router classified as
+    `search` but which then produced a poor RRF score.
 
     Escalation thresholds:
       * `exact.escalate_below = 0.5` — id-token hits (`relevance == 1.0`)
@@ -221,6 +232,13 @@ def build_orchestrator_with_store(store: object) -> CascadeOrchestrator:
         a permissive floor that escalates only when both arms missed
         outright. Tune downward if recall is acceptable but escalation
         is too aggressive.
+      * `agentic.escalate_below = 0.5` — AgenticTier's algorithmic
+        relevance is one of {0.0, 0.3, 0.7} (failed / ungrounded /
+        grounded). 0.5 terminates on grounded answers and escalates
+        past failed/ungrounded so the cascade falls back to `stub`
+        rather than returning a low-trust prose answer as the final
+        result. Tune to 0.2 if "any answer beats no answer" matches
+        the deployment's latency tolerance.
       * `stub.escalate_below = 0.0` — terminal: never escalates past.
 
     Embedder selection: defaults to `StubEmbedder` so the cascade boots
@@ -242,6 +260,14 @@ def build_orchestrator_with_store(store: object) -> CascadeOrchestrator:
     `backend/retrieval/router_train/README.md` for the Pioneer.ai
     fine-tune workflow.
 
+    AgenticTier LLM backend: selected via `QONTEXT_AGENTIC=gemini`
+    (requires `GEMINI_API_KEY`). Default is `noop` — a `StubLLMClient`
+    scripted with a single `"agentic backend not configured"` prose
+    answer so the cascade still returns a typed result without
+    pretending to reason. Real analytical queries need
+    `QONTEXT_AGENTIC=gemini` plus a working API key. See
+    `ralph/plans/human-backlog.txt` for the env-setup checklist.
+
     `store` is typed as `object` to dodge an import cycle
     (`backend.graph.store` imports `backend.models`). The runtime check
     enforces the real type.
@@ -251,6 +277,12 @@ def build_orchestrator_with_store(store: object) -> CascadeOrchestrator:
 
     from backend.graph.store import GraphStore
 
+    from .agentic import (
+        AgenticTier,
+        GeminiLLMClient,
+        LLMClient,
+        NoopLLMClient,
+    )
     from .embedder import BgeSmallEmbedder, Embedder, StubEmbedder
     from .exact import ExactTier
     from .hybrid import HybridTier
@@ -282,16 +314,31 @@ def build_orchestrator_with_store(store: object) -> CascadeOrchestrator:
         raise ValueError(
             f"QONTEXT_ROUTER must be 'stub' or 'gliner2', got {router_kind!r}"
         )
+    agentic_kind = os.environ.get("QONTEXT_AGENTIC", "noop").lower()
+    if agentic_kind == "gemini":
+        llm: LLMClient = GeminiLLMClient()
+    elif agentic_kind == "noop":
+        # Reusable single-turn marker. Marked ungrounded
+        # (relevance=0.3) — escalation past `agentic` to `stub` is
+        # the intended behavior here. Distinct from the test-only
+        # `StubLLMClient` (which is single-use scripted).
+        llm = NoopLLMClient()
+    else:
+        raise ValueError(
+            f"QONTEXT_AGENTIC must be 'gemini' or 'noop', got {agentic_kind!r}"
+        )
     exact = ExactTier(store)
     router_tier = RouterTier(entity_router, exact)
     hybrid = HybridTier(store, embedder)
+    agentic = AgenticTier(store, embedder, llm)
     stub = StubTier(name="stub")
     return CascadeOrchestrator(
-        tiers=[exact, router_tier, hybrid, stub],
+        tiers=[exact, router_tier, hybrid, agentic, stub],
         configs=[
             TierConfig(name="exact", escalate_below=0.5),
             TierConfig(name="router", escalate_below=0.5),
             TierConfig(name="hybrid", escalate_below=0.3),
+            TierConfig(name="agentic", escalate_below=0.5),
             TierConfig(name="stub", escalate_below=0.0),
         ],
     )

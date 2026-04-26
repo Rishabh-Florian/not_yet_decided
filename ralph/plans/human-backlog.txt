@@ -89,3 +89,38 @@ the upgrade you unlock by completing the steps above.
    - Requires Neo4j 5.x + EnterpriseBench data ingested + embeddings populated.
    - Run: `RUN_INTEGRATION=1 uv run pytest -q backend/retrieval/tests/test_hybrid.py` then `uv run python -m backend.eval.harness --limit 100`.
 
+---
+
+## 2026-04-26 — #5 AgenticTier Gemini backend (HUMAN-ONLY)
+
+The runtime code is shipped behind the `LLMClient` Protocol with a
+`NoopLLMClient` default, so the cascade boots cleanly without a
+GEMINI key. To enable real analytical reasoning:
+
+1. Get a Gemini API key from https://aistudio.google.com/apikey.
+2. Add to `.env` (or your shell environment):
+   ```
+   GEMINI_API_KEY=<your key>
+   QONTEXT_AGENTIC=gemini
+   ```
+   Optional: if the same key hits 429 quota due to ingest sharing,
+   create a second project key and set
+   `GEMINI_API_KEY_AGENT=<key>` then thread it through the
+   `GeminiLLMClient(api_key=...)` constructor (current default reads
+   `GEMINI_API_KEY`; the secondary-key wiring is a one-line follow-up).
+3. Verify (network-required): `GEMINI_API_KEY=... uv run pytest -q
+   backend/retrieval/tests/test_agentic.py::TestAgenticTierGeminiIntegration`.
+4. Smoke the live endpoint:
+   ```
+   curl -X POST localhost:8000/api/query \
+     -d '{"query":"which customers had support cases handled by emp_1002"}'
+   ```
+   Expect `tier_used="agentic"` and `relevance >= 0.7` (grounded with
+   citations) when both Neo4j is populated and the key is live.
+
+**Defaults meanwhile:** without `QONTEXT_AGENTIC=gemini`, the cascade
+uses `NoopLLMClient` — AgenticTier returns a marker text with
+relevance 0.3 (ungrounded) so the cascade escalates past it to
+`stub`. `analytical` intent queries from the router will still hit
+AgenticTier (route_to honored) but produce no real reasoning.
+

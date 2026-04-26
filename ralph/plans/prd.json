@@ -46,8 +46,9 @@
         "category": "feat-retrieval",
         "description": "R3 Tier 4 AgenticTier (Gemini function-calling). Needs GEMINI_API_KEY.",
         "depends_on": [2],
-        "passes": false,
-        "blocked": false
+        "passes": true,
+        "blocked": false,
+        "notes": "NoopLLMClient ships as default; real Gemini gated on GEMINI_API_KEY (see human-backlog)."
     },
     {
         "issue": 7,

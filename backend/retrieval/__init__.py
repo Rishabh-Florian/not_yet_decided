@@ -6,6 +6,16 @@ live behind that wall (deep module).
 """
 from __future__ import annotations
 
+from .agentic import (
+    AgenticTier,
+    GeminiLLMClient,
+    LLMClient,
+    LLMTurn,
+    NoopLLMClient,
+    StubLLMClient,
+    ToolCall,
+    ToolResult,
+)
 from .embedder import BgeSmallEmbedder, Embedder, StubEmbedder
 from .engine import ContextEngine
 from .exact import ExactTier
@@ -27,6 +37,7 @@ from .router import (
 from .tiers import StubTier, Tier
 
 __all__ = [
+    "AgenticTier",
     "BgeSmallEmbedder",
     "CascadeOrchestrator",
     "Citation",
@@ -35,17 +46,24 @@ __all__ = [
     "EntityRouter",
     "ExactTier",
     "GLiNER2EntityRouter",
+    "GeminiLLMClient",
     "Hit",
     "HybridTier",
+    "LLMClient",
+    "LLMTurn",
+    "NoopLLMClient",
     "QueryContext",
     "QueryResult",
     "RouterDecision",
     "RouterTier",
     "StubEmbedder",
     "StubEntityRouter",
+    "StubLLMClient",
     "StubTier",
     "Tier",
     "TierConfig",
+    "ToolCall",
+    "ToolResult",
     "build_default_orchestrator",
     "build_orchestrator_with_store",
 ]
