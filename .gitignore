@@ -40,5 +40,8 @@ out/
 # generated eval reports
 backend/eval/reports/
 
-# Pioneer.ai GLiNER2 fine-tuned weights (downloaded by human, not in git)
-pioneer/weights/
+# Pioneer.ai GLiNER2 fine-tuned weights — gitignored by default,
+# but the v2 LoRA adapter (~11 MB) is small enough to ship in-repo
+# so anyone cloning gets the production router straight away.
+pioneer/weights/*
+!pioneer/weights/inazuma-gliner2-v2/

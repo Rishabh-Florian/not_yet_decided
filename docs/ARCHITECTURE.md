@@ -18,21 +18,22 @@
 > | REST API — Graph read endpoints | **done** | `backend/api/app.py` — 7 GET endpoints |
 > | REST API — Graph pattern query | **done** | `POST /api/graph/query` — typed pattern DSL |
 > | REST API — Edit API (human-in-the-loop) | **done** | `PUT /api/graph/node/{id}` — provenance-tracked edits |
-> | VFS API (ls, cat, grep, find, stat, tree) | not yet | VFS is a logical view (no disk materialization) — endpoints not built |
+> | VFS (ls, cat, grep, find, stat, tree) | **done** (tools-only) | `backend/vfs/` — `VFS` class with six pure-Cypher reads. Surfaced as Gemini function-calling tools (`vfs_ls` / `vfs_cat` / `vfs_grep` / `vfs_find` / `vfs_stat` / `vfs_tree`) in `backend/retrieval/tools.py`; no REST endpoints (intentional — frontend doesn't consume it, agent path goes through tool calls). MCP wrapper deferred to its own PR. |
 > | Search API (semantic + hybrid, Neo4j HNSW) | **done** (R0/R1/R2/R3/R4) | Cascade + Cypher/fulltext + vector+RRF + **fine-tuned 205M GLiNER2 SLM pre-router (Pioneer Round 1: 91.1% intent acc / 0.394 macro NER F1 / 467ms p95 — beats GPT-4o on all three)** + bounded Gemini function-calling agentic tier. Cross-encoder rerank still pending. Embedding population (`backend/retrieval/embed.py`) is a manual one-shot pass. |
 > | Workflow API (frozen-policy retrieval) | **done** | R5a framework + R5b `answer-customer-email` + R5c `thread-summary`. `GET/POST /api/workflow{,/{name}}`. Built-ins registered explicitly at FastAPI startup via `register_builtin_workflows()` (no import-side-effect). |
 > | Conflict resolution engine + UI | not yet | Rule-based + LLM triage designed, not implemented |
 > | MCP server (for Claude / AI agents) | not yet | MCP tool wrappers over existing API |
 > | Web UI (React + Next.js) | not yet | No frontend code |
-> | ~~VFS materialization to disk~~ | dropped | Not needed: raw records already verbatim in `source_records`, VFS is a logical view computed from `GraphNode.vfs_path` via Cypher. No re-materialization on edit. |
+> | ~~VFS materialization to disk~~ | dropped | Not needed: raw records are already verbatim in `source_records`. VFS is a query-time lens, not a stored projection. |
+> | ~~Per-node `vfs_path` column~~ | dropped | The original design stamped a path on every node at ingest. Implementation chose a simpler shape: the path is **derived** from `(canonical_type, node_id)` at request time, no ingestion change. The `vfs_path` column on `:Entity` is unused (kept for now to avoid a Neo4j schema migration). |
 > | ~~ChromaDB / external vector index~~ | dropped | Replaced by Neo4j native vector indexes (5.13+, HNSW). Embeddings live on `:Entity` nodes; one database, no sync. |
 >
 > ### User Flow Status
 >
 > | Flow | Description | Status | What's working | What's missing |
 > |------|-------------|--------|----------------|----------------|
-> | **Flow 1** | AI Agent Retrieves Context (VFS browse) | not yet | — | VFS API endpoints (`ls`, `cat`, `grep`, `find`) |
-> | **Flow 2** | AI Agent Answers Complex Question (pattern query) | **partial** | `POST /api/graph/query` returns typed pattern matches with provenance | VFS `cat` for enriching results with full entity files |
+> | **Flow 1** | AI Agent Retrieves Context (VFS browse) | **done** (agent path) | Six VFS tools (`vfs_ls`/`vfs_cat`/`vfs_grep`/`vfs_find`/`vfs_stat`/`vfs_tree`) wired into `backend/retrieval/tools.py`; AgenticTier picks among them in its function-calling loop. No REST endpoints (frontend doesn't consume them) | MCP wrapper |
+> | **Flow 2** | AI Agent Answers Complex Question (pattern query) | **done** | `POST /api/graph/query` returns typed pattern matches with provenance; `vfs_cat` enriches a candidate node with full attributes + grouped neighbors + linked raw records in one call | — |
 > | **Flow 3** | Human Browses Company Memory (web UI) | not yet | — | Frontend (React + Next.js), graph visualization |
 > | **Flow 4** | Human Resolves Conflict (conflict queue) | not yet | — | Conflict detection engine, resolution API, queue UI |
 > | **Flow 5** | Human Edits Company Memory (edit + provenance) | **done** | `PUT /api/graph/node/{id}` with synthetic source records, per-attribute human provenance, version bumps | — |
@@ -119,7 +120,7 @@ The system ingests the Inazuma.co EnterpriseBench dataset (~50K records across 1
 | **Knowledge Graph + Vector Search** | Neo4j 5.13+ (graph + native HNSW vector index) + SQLite (provenance, raw records, ingestion control plane) | One database for graph and embeddings — no separate vector store to sync. ChromaDB removed. |
 | **LLM** | Claude API (claude-sonnet-4-6) | Entity extraction, conflict resolution, summarization |
 | **Frontend** | Next.js 14 + React + Tailwind + shadcn/ui | Fast to prototype, good file-tree components |
-| **VFS** | Logical view via `GraphNode.vfs_path` + Cypher queries | Raw records already verbatim in `source_records`; no need to write a parallel tree of markdown files to disk. |
+| **VFS** | Query-time lens over canonical types — `backend/vfs/operations.py` translates `/{Type}/{node_id}` paths into Cypher reads. Two-level tree, derived from `CANONICAL_NODE_TYPES`. No stored `vfs_path`, no markdown files on disk. | Raw records already verbatim in `source_records`; the canonical-type tree generalizes to any new type with zero VFS code change (just edit `canonical.yaml`). |
 | **PDF Parsing** | PyMuPDF (fitz) | Fast, reliable PDF text extraction |
 | **Data Parsing** | pandas + orjson | High-performance JSON/CSV handling |
 
@@ -698,7 +699,18 @@ concept and lives on retrieval result objects, not on `Provenance`.
 
 ### Component 6: Virtual File System (VFS)
 
-The VFS is the **product surface** — the primary way both humans and AI agents interact with the company memory. It materializes the knowledge graph as a navigable directory tree.
+> **Implementation status (2026-04-26).** The implemented VFS departs
+> from the elaborate `/company/people/<dept>/<emp_id>-<slug>.md` tree
+> sketched below. The shipped shape is **two-level and derived from the
+> canonical type registry** — see [VFS (implemented)](#vfs-implemented)
+> further down. The original directory layout below is kept as
+> historical context: it described a per-source-tailored human-friendly
+> tree that would have required per-canonical-type path rules,
+> department slugs, etc. The implementation chose generality over
+> ergonomics — `/{CanonicalType}/{node_id}` works for any tenant
+> without VFS code changes.
+
+The VFS is the **product surface** — the primary way both humans and AI agents interact with the company memory. The original design materialized the knowledge graph as a deep navigable directory tree (`/company/people/engineering/emp_0431-raj-patel.md`, etc.); the implementation collapsed that to a two-level type-flat tree (`/Person/person:emp_0431`).
 
 **Directory structure:**
 
@@ -871,17 +883,86 @@ Python, Machine Learning, System Design, ...
 
 ---
 
+### VFS (implemented)
+
+> Supersedes the directory layout above. The shipped surface is six
+> tools, no REST endpoints, no markdown materialization, no per-type
+> path rules.
+
+```
+backend/vfs/
+  operations.py    VFS class — six pure-Cypher reads
+  models.py        FileBody / DirEntry / GrepHit / StatInfo / TreeNode
+  tests/...        32 unit tests (mocked GraphStore, no live Neo4j)
+backend/retrieval/tools.py   +6 ToolDefinitions, +6 ToolBox methods
+```
+
+**Path tree.** Two levels, derived from `CANONICAL_NODE_TYPES`:
+
+```
+/                       root      → list canonical types
+/{Type}/                directory → list nodes of that canonical type
+/{Type}/{node_id}       file      → vfs_cat target
+```
+
+The `Type` segment is validated against the canonical registry on every
+call. Adding a new canonical type to `canonical.yaml` makes it appear
+under `/` automatically — no VFS code change.
+
+**Six operations.** All read-only. All ingest-change-free; nothing is
+stored on the node, no `vfs_path` column is read.
+
+| Op | Backed by |
+|---|---|
+| `ls(path)` | `MATCH (n:Entity {type: $t})` paged by node id, or per-type counts at root |
+| `cat(path)` | `get_node` + neighbor Cypher (grouped by relation type) + `source_records` join via provenance — single payload (`FileBody`) |
+| `stat(path)` | metadata only — id, type, version, source_files, provenance_count |
+| `grep(query, path)` | reuses the existing `node_text` Lucene fulltext index, scoped by `n.type = $t` when path is `/{Type}/...` |
+| `find(path, where, modified_after)` | bounded Cypher slice + Python-side attribute equality filter (no apoc dep) |
+| `tree(path, depth)` | recursive listing capped at depth 3 |
+
+**Surface.** Tools-only — agents reach the VFS through Gemini
+function-calling. The same `ToolBox` that exposes `pattern_query` /
+`fulltext_search` / `vector_search` / `get_node` / `get_neighbors` /
+`get_source_record` now also exposes `vfs_ls` / `vfs_cat` / `vfs_grep` /
+`vfs_find` / `vfs_stat` / `vfs_tree`. Citations accumulate on every
+`cat`/`stat`/`grep`/`find`/`ls` hit so the agent's grounded-answer
+score reflects what it actually surfaced.
+
+**No REST endpoints.** The frontend already renders the graph
+(`/app/graph`); humans don't need a parallel file-browser. If a third
+consumer (admin CLI, MCP server) shows up, the existing `VFS` class is
+a one-import wrapper away.
+
+**`cat` payload (`FileBody`).** Single read, three sections:
+
+```python
+class FileBody(BaseModel):
+    path: str
+    frontmatter: dict       # id, type, version, source_files, last_updated
+    attributes: dict        # canonical attrs from the node
+    relations: dict[str, list[NeighborRef]]   # grouped by relation type
+    provenance: list[ProvenanceResponse]
+    raw_evidence: list[SourceRecordResponse]  # one per unique source record
+```
+
+`raw_evidence` is the verbatim source records the canonical attrs were
+extracted from — this is how the agent grounds answers in original text
+without a second tool call.
+
+---
+
 ### Component 7: Search Engine (Hybrid)
 
 Three retrieval modes, composable:
 
-**Mode 1: VFS operations (for agents)**
+**Mode 1: VFS operations (for agents)** — implemented as Gemini tools, see [VFS (implemented)](#vfs-implemented).
 
 ```
-ls /company/people/engineering/        → list all engineering employees
-cat /company/people/engineering/emp_0431-raj-patel.md  → read employee file
-grep -r "VPN" /company/it/tickets/     → search across IT tickets
-find /company/ -name "*.md" -newer 2022-01-01  → recent files
+vfs_ls("/Person/")                                    → list every Person node
+vfs_cat("/Person/person:emp_0431")                    → full FileBody for one employee
+vfs_grep("VPN", path="/Message/")                     → search across messages
+vfs_find("/Person/", where={"category": "engineering"})  → typed filter
 ```
 
 **Mode 2: Semantic search (for natural language queries)**
@@ -957,11 +1038,11 @@ Step 5: BUILD GRAPH
     → Compute confidence scores
     → Build temporal validity windows
 
-Step 6: ASSIGN VFS PATHS
-  Walk the knowledge graph:
-    → Set `GraphNode.vfs_path` (e.g. /company/people/<dept>/<emp_id>-<slug>)
-    → No file writes — VFS is a logical view computed from this string + Cypher
-    → `_index` summaries are derived on demand from queries
+Step 6: (no-op in implemented pipeline)
+  The original design stamped a `GraphNode.vfs_path` per node here.
+  The shipped VFS derives the path at query time from
+  (canonical_type, node_id), so this step was dropped — saving an
+  ingestion pass without losing any retrieval capability.
 
 Step 7: INDEX FOR SEARCH
   For each :Entity node worth indexing:
@@ -1158,16 +1239,27 @@ commit last, Neo4j compensated on failure.
 3. `GET /api/source/{source_file}/{source_record_id}` returns the original raw JSON record
 4. The UI can show: fact -> extraction method -> source file -> original value
 
-### VFS API (file-system operations for agents) -- NOT YET IMPLEMENTED
+### VFS API (file-system operations for agents) -- LANDED (tools-only)
 
+REST endpoints were intentionally **not** implemented — the frontend
+already renders the graph and humans don't need a parallel
+file-browser. The VFS is consumed exclusively through Gemini tool
+calls; the `VFS` class lives in `backend/vfs/operations.py` and is
+surfaced via six `ToolDefinition`s in `backend/retrieval/tools.py`.
+
+```python
+# Equivalent tool calls (the agent picks among these in its function-calling loop):
+vfs_ls(path="/Person/", limit=25)
+vfs_cat(path="/Person/person:emp_0431")          # → FileBody
+vfs_grep(query="VPN", path="/Message/")
+vfs_find(path="/Person/", where={"category": "engineering"})
+vfs_stat(path="/Person/person:emp_0431")
+vfs_tree(path="/", depth=1)
 ```
-GET  /api/vfs/ls?path=/company/people/          # List directory
-GET  /api/vfs/cat?path=/company/people/eng/...   # Read file
-GET  /api/vfs/grep?pattern=VPN&path=/company/it/ # Search text
-GET  /api/vfs/find?name=*.md&path=/company/      # Find files
-GET  /api/vfs/stat?path=/company/people/eng/...   # File metadata (provenance, version)
-GET  /api/vfs/tree?path=/company/&depth=2         # Directory tree
-```
+
+Path syntax is two-level (`/{Type}/{node_id}`); see
+[VFS (implemented)](#vfs-implemented) for the full implementation.
+MCP wrapping over the same `VFS` class is a separate PR.
 
 ### Search API (hybrid retrieval) -- LANDED (R0/R1/R2/R3/R4)
 
