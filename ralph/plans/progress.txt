@@ -48,4 +48,17 @@
 - Deferred (logged in human-backlog.txt): sentence-transformers dep, reranker, embedding population, recall/latency benchmarks.
 - Next: #6 (R4 RouterTier - GLiNER2).
 
+### 2026-04-26 — #6 done (R4 RouterTier - Pioneer.ai GLiNER2)
+- backend/retrieval/router.py: RouterTier(router, exact_tier, *, min_intent_conf=0.5, next_tier_for=...). EntityRouter Protocol + StubEntityRouter (regex) + GLiNER2EntityRouter (lazy gliner; raises if GLINER2_MODEL_PATH/PIONEER_AI_MODEL_ID unset).
+- backend/retrieval/router_train/: prompt.md, seed_examples.jsonl (50), eval_set.jsonl (45), README.md (12-step Pioneer workflow + Pioneer side-challenge submission checklist).
+- scripts/gen_router_seed.py: re-derive seeds from tasks.jsonl.
+- Cascade: [exact, router, hybrid, stub]. Router placed after exact so id-token regex hits never spend 200ms NER budget.
+- New: QueryResult.route_to: str | None — orchestrator honors at most once per query, never revisits a tier (3 new tests).
+- Hit.score for RouterTier: forwarded verbatim from delegated ExactTier on lookup; zero hits + relevance=0.0 on search/analytical/ambiguous (router is a routing decision, not a retriever — documented).
+- analytical → agentic (R3, not yet landed); orchestrator falls through to next-in-order if route_to unknown.
+- gliner package NOT in pyproject (~700MB transitive); StubEntityRouter keeps CI green.
+- Verifiers: ruff clean, pyright 0 errors, pytest 185 passed / 15 skipped.
+- Pioneer.ai fine-tune logged in human-backlog.txt (12 steps, full materials prepared).
+- Next: #5 (R3 AgenticTier - Gemini).
+
 ---

@@ -77,6 +77,13 @@ class QueryResult(BaseModel):
 
     `answer` is filled by LLM-backed tiers (R3+). For raw-retrieval tiers
     (R1/R2) it is `None` — the caller composes the answer.
+
+    `route_to` is an optional pre-route directive emitted by routing
+    tiers (R4 `RouterTier`). When set AND `relevance < escalate_below`,
+    the orchestrator skips ahead to the named tier instead of walking
+    to the next one in cascade order. Non-routing tiers leave it
+    `None`. The directive is honored at most once per query — the
+    target tier's own result is final (no chained re-routing).
     """
 
     answer: str | None
@@ -93,3 +100,4 @@ class QueryResult(BaseModel):
         ),
     )
     latency_ms: int = Field(..., ge=0)
+    route_to: str | None = None

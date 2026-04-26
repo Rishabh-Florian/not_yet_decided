@@ -19,7 +19,7 @@
 > | REST API — Graph pattern query | **done** | `POST /api/graph/query` — typed pattern DSL |
 > | REST API — Edit API (human-in-the-loop) | **done** | `PUT /api/graph/node/{id}` — provenance-tracked edits |
 > | VFS API (ls, cat, grep, find, stat, tree) | not yet | VFS is a logical view (no disk materialization) — endpoints not built |
-> | Search API (semantic + hybrid, Neo4j HNSW) | partial | R0/R1/R2 tiers landed (cascade + Cypher/fulltext + vector+RRF). Cross-encoder rerank still pending. Embedding population (`backend/retrieval/embed.py`) is a manual one-shot pass. |
+> | Search API (semantic + hybrid, Neo4j HNSW) | partial | R0/R1/R2/R4 tiers landed (cascade + Cypher/fulltext + vector+RRF + Pioneer.ai GLiNER2 pre-router behind a Protocol with stub fallback). Cross-encoder rerank and R3 agentic tier still pending. Embedding population (`backend/retrieval/embed.py`) is a manual one-shot pass. |
 > | Conflict resolution engine + UI | not yet | Rule-based + LLM triage designed, not implemented |
 > | MCP server (for Claude / AI agents) | not yet | MCP tool wrappers over existing API |
 > | Web UI (React + Next.js) | not yet | No frontend code |
@@ -1163,7 +1163,7 @@ GET  /api/vfs/stat?path=/company/people/eng/...   # File metadata (provenance, v
 GET  /api/vfs/tree?path=/company/&depth=2         # Directory tree
 ```
 
-### Search API (hybrid retrieval) -- PARTIAL (R0 cascade spine landed, tiers pending)
+### Search API (hybrid retrieval) -- PARTIAL (R0/R1/R2/R4 landed; R3 agentic pending)
 
 The retrieval surface is a **single endpoint** backed by a cascade
 orchestrator. Callers POST a query, the orchestrator walks the
@@ -1195,15 +1195,39 @@ Each tier documents which algorithm it uses on its `Hit.score` and
 
 | Tier | Status | Algorithm | Issue |
 |---|---|---|---|
-| `stub` | LANDED (R0) | always returns 0 hits, relevance 0.0 | #2 |
 | `exact` | LANDED (R1) | Cypher exact id match + Neo4j fulltext (`node_text`, BM25-similar normalized to [0,1)) | #3 |
+| `router` | LANDED (R4) | Pioneer.ai GLiNER2 multi-task (intent classification + NER) — pre-routes to T1 (lookup), T3 (search), or T4 (analytical); abstains otherwise | #6 |
 | `hybrid` | LANDED (R2) | Neo4j HNSW vector + fulltext (`node_text`) fused by Reciprocal Rank Fusion (k=60), normalized by max possible RRF | #4 |
 | `agentic` | pending (R3) | Gemini function-calling over store ops | #5 |
+| `stub` | LANDED (R0) | always returns 0 hits, relevance 0.0 (terminal fallback) | #2 |
 
-**Pre-routing** (R4, issue #6 — Pioneer.ai GLiNER2): a router will
-classify the incoming query and pre-populate `QueryContext.prefer_tier`
-so the orchestrator jumps to the right tier on the first try. The hook
-already exists in R0 — `prefer_tier` is honored today.
+**Default cascade order:** `[exact, router, hybrid, stub]`. Production
+factory `build_orchestrator_with_store(store)` wires this. Router sits
+between exact and hybrid: pure id queries (`emp_1002`) hit the cheap
+ExactTier regex first; only on a miss does the GLiNER2 pre-route fire,
+adding NER recall on natural-language queries.
+
+**Pre-route directive.** A tier may set `QueryResult.route_to=<tier>`
+to skip the cascade ahead. Honored at most once per query so a router
+misclassification cannot cycle. RouterTier emits `route_to="hybrid"`
+on `search` intent and `route_to="agentic"` on `analytical`. On
+`lookup` intent it inline-delegates to ExactTier and returns
+ExactTier's hits verbatim (re-tagged `tier_used="router"`); on
+`ambiguous` it abstains with no directive and the cascade falls
+through to the next slot. The earlier `QueryContext.prefer_tier` hook
+also still works — it lets the *caller* (not a tier) reorder the
+cascade up-front.
+
+**Router backend.** Hidden behind the `EntityRouter` Protocol:
+- `StubEntityRouter` (default) — deterministic regex classifier; no
+  model dependency. Keeps CI green and the cascade booting on
+  machines without the fine-tune.
+- `GLiNER2EntityRouter` (production) — loads weights from
+  `GLINER2_MODEL_PATH` (local) or `PIONEER_AI_MODEL_ID` (Pioneer
+  endpoint). Fail-fast if neither is set. Selected by
+  `QONTEXT_ROUTER=gliner2`. Requires `uv add gliner` and the
+  Pioneer.ai fine-tune (see
+  `backend/retrieval/router_train/README.md`).
 
 **Eval harness** (`backend/eval/`):
 

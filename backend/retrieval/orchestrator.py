@@ -1,20 +1,28 @@
 """Cascade orchestrator — try fast tiers first, escalate on miss.
 
-Cascade is the **default and only** path through R3. A pre-routing
-classifier (an upfront tier picker based on the query's shape) is the
-job of R4 (issue #6 — Pioneer.ai GLiNER2 RouterTier). The hook for it
-is intentionally the same `QueryContext.prefer_tier` field tiers already
-honor: a future router will populate that hint before the orchestrator
-runs, jumping the cascade to the right tier on the first try. Until then
-we walk every registered tier in order.
+Cascade is the **default** path. Two override hooks exist:
+
+1. `QueryContext.prefer_tier` — caller-supplied hint. The orchestrator
+   reorders the cascade so the named tier runs first; the rest follow
+   in the original order. Set this when the caller already knows which
+   tier to run (e.g. `prefer_tier="exact"` for an id-only request).
+2. `QueryResult.route_to` — pre-route directive emitted by a routing
+   tier (R4 `RouterTier`, issue #6 — Pioneer.ai GLiNER2). When the
+   router produces a low-relevance result that names a downstream
+   tier, the orchestrator skips ahead to that tier instead of walking
+   to the next one in cascade order. The directive fires at most once
+   per query (no chained re-routing) so a misclassification cannot
+   send the cascade into a cycle.
 
 Escalation rule (per-tier configurable):
 
 * Run tier ``T``.
 * If ``T.search()`` raises, the orchestrator re-raises (fail fast).
 * Otherwise compare ``result.relevance`` against ``T``'s configured
-  ``escalate_below`` threshold. If ``relevance < escalate_below``, the
-  orchestrator moves to the next tier; else it returns the result.
+  ``escalate_below`` threshold. If ``relevance < escalate_below``:
+  - if the result carries `route_to=X` and `X` is registered AND has
+    not already run, jump to `X` next;
+  - else fall through to the next tier in cascade order.
 * If all tiers escalate past, the orchestrator returns the **last**
   tier's result (best-effort) — never an exception, never an empty
   fabrication. This is the only "soft" path, and it's intentional:
@@ -93,7 +101,16 @@ class CascadeOrchestrator:
 
         ordered = self._order_for(ctx)
         last_result: QueryResult | None = None
-        for tier_name in ordered:
+        executed: set[str] = set()
+        # Pre-route directives are honored at most once per query so a
+        # router misclassification cannot cycle the cascade.
+        reroute_consumed = False
+        i = 0
+        while i < len(ordered):
+            tier_name = ordered[i]
+            if tier_name in executed:
+                i += 1
+                continue
             tier = self._tier_by_name(tier_name)
             cfg = self._configs[tier_name]
             tier_ctx = ctx
@@ -115,8 +132,24 @@ class CascadeOrchestrator:
                 )
             result = result.model_copy(update={"latency_ms": latency_ms})
             last_result = result
+            executed.add(tier_name)
             if result.relevance >= cfg.escalate_below:
                 return result
+            # Pre-route directive (R4 RouterTier). Honor at most once per
+            # query: a router that asks for an unknown / already-run tier
+            # is treated as an abstain (fall through to the next tier in
+            # cascade order).
+            if (
+                not reroute_consumed
+                and result.route_to is not None
+                and result.route_to in self._configs
+                and result.route_to not in executed
+            ):
+                reroute_consumed = True
+                ordered = ordered[: i + 1] + [result.route_to] + [
+                    n for n in ordered[i + 1 :] if n != result.route_to
+                ]
+            i += 1
         assert last_result is not None  # invariant: at least one tier ran
         return last_result
 
@@ -153,19 +186,35 @@ def build_default_orchestrator(tiers: list[Tier]) -> CascadeOrchestrator:
 
 
 def build_orchestrator_with_store(store: object) -> CascadeOrchestrator:
-    """Production cascade for `POST /api/query`: `[ExactTier, HybridTier, StubTier]`.
+    """Production cascade for `POST /api/query`: `[ExactTier, RouterTier, HybridTier, StubTier]`.
 
     Tier order:
       1. `exact`  — Cypher id lookup + Neo4j fulltext (R1, issue #3)
-      2. `hybrid` — vector + fulltext fused by RRF (R2, issue #4)
-      3. `stub`   — terminal no-op so the cascade always returns a result
+      2. `router` — Pioneer.ai GLiNER2 pre-route (R4, issue #6)
+      3. `hybrid` — vector + fulltext fused by RRF (R2, issue #4)
+      4. `stub`   — terminal no-op so the cascade always returns a result
+
+    Why is `router` after `exact`? Pure id queries (`emp_1002`) are
+    already caught by ExactTier's regex; running an NER model on them
+    is wasted latency. The router earns its 200ms budget on natural
+    language queries that contain entities buried in prose
+    (`"Send a message to Anil Rathore..."`). On an exact id miss the
+    router runs, may extract an id ExactTier missed, and either
+    delegates back to ExactTier inline (`lookup` intent) or emits a
+    `route_to` directive that skips the cascade ahead.
 
     Escalation thresholds:
       * `exact.escalate_below = 0.5` — id-token hits (`relevance == 1.0`)
         terminate immediately; weak fulltext hits (normalized BM25 <
-        0.5) escalate to the hybrid tier. The 0.5 cutoff corresponds to
+        0.5) escalate to the router. The 0.5 cutoff corresponds to
         a raw Lucene score of 1.0 after `score / (1 + score)`
         normalization.
+      * `router.escalate_below = 0.5` — `lookup` decisions return
+        ExactTier's relevance (1.0 for id-token hits) and terminate;
+        `search`/`analytical`/`ambiguous` decisions return relevance=0
+        plus an optional `route_to` directive and the orchestrator
+        skips ahead per that directive (or falls through to the next
+        tier in cascade order if absent).
       * `hybrid.escalate_below = 0.3` — RRF scores are normalized so
         rank-1-in-both-arms == 1.0; in practice realistic queries score
         between 0.4 and 0.8 (single-arm hits land at ~0.5 max). 0.3 is
@@ -184,6 +233,15 @@ def build_orchestrator_with_store(store: object) -> CascadeOrchestrator:
     The vector index population is a separate one-shot pass (run
     `uv run python -m backend.retrieval.embed` once Neo4j has data).
 
+    Router backend selection: defaults to `StubEntityRouter` (regex
+    fallback, deterministic, no model). Set `QONTEXT_ROUTER=gliner2`
+    AND one of `GLINER2_MODEL_PATH` (local weights) or
+    `PIONEER_AI_MODEL_ID` to use the fine-tuned GLiNER2 backend.
+    Without those, the stub fallback keeps the cascade green but does
+    NOT produce real NER spans — see
+    `backend/retrieval/router_train/README.md` for the Pioneer.ai
+    fine-tune workflow.
+
     `store` is typed as `object` to dodge an import cycle
     (`backend.graph.store` imports `backend.models`). The runtime check
     enforces the real type.
@@ -196,6 +254,12 @@ def build_orchestrator_with_store(store: object) -> CascadeOrchestrator:
     from .embedder import BgeSmallEmbedder, Embedder, StubEmbedder
     from .exact import ExactTier
     from .hybrid import HybridTier
+    from .router import (
+        EntityRouter,
+        GLiNER2EntityRouter,
+        RouterTier,
+        StubEntityRouter,
+    )
     from .tiers import StubTier
 
     if not isinstance(store, GraphStore):
@@ -209,13 +273,24 @@ def build_orchestrator_with_store(store: object) -> CascadeOrchestrator:
         raise ValueError(
             f"QONTEXT_EMBEDDER must be 'bge' or 'stub', got {embedder_kind!r}"
         )
+    router_kind = os.environ.get("QONTEXT_ROUTER", "stub").lower()
+    if router_kind == "gliner2":
+        entity_router: EntityRouter = GLiNER2EntityRouter()
+    elif router_kind == "stub":
+        entity_router = StubEntityRouter()
+    else:
+        raise ValueError(
+            f"QONTEXT_ROUTER must be 'stub' or 'gliner2', got {router_kind!r}"
+        )
     exact = ExactTier(store)
+    router_tier = RouterTier(entity_router, exact)
     hybrid = HybridTier(store, embedder)
     stub = StubTier(name="stub")
     return CascadeOrchestrator(
-        tiers=[exact, hybrid, stub],
+        tiers=[exact, router_tier, hybrid, stub],
         configs=[
             TierConfig(name="exact", escalate_below=0.5),
+            TierConfig(name="router", escalate_below=0.5),
             TierConfig(name="hybrid", escalate_below=0.3),
             TierConfig(name="stub", escalate_below=0.0),
         ],

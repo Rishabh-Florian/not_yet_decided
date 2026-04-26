@@ -10,6 +10,68 @@ or did not have the permissions to authenticate, do xyz.
 
 ---
 
+## 2026-04-26 — #6 RouterTier Pioneer.ai GLiNER2 fine-tune (HUMAN-ONLY)
+
+The runtime code is shipped behind a Protocol with `StubEntityRouter`
+fallback. The fine-tune step itself MUST be done by a human in the
+Pioneer.ai dashboard — it cannot be done from CLI.
+
+**Files prepared for you (input to Pioneer):**
+- `backend/retrieval/router_train/prompt.md` — paste verbatim into
+  Pioneer's "Agent prompt" / "System instructions" field.
+- `backend/retrieval/router_train/seed_examples.jsonl` — 50 hand
+  curated `{query, intent, entities}` examples; upload as Pioneer's
+  seed/example data.
+- `backend/retrieval/router_train/eval_set.jsonl` — 45 held-out
+  items; upload as Pioneer's eval split.
+- `backend/retrieval/router_train/README.md` — full step-by-step
+  workflow (12 steps, includes synthetic-data generation flow,
+  acceptance targets, calibration notes, side-challenge submission
+  checklist).
+
+**What you do, in order:**
+1. Sign up / log into Pioneer.ai (hackathon onboarding link in the
+   README).
+2. New Job -> Model = GLiNER2 -> Task = "intent classification +
+   NER (multi-task)".
+3. Paste body of `prompt.md` into the agent prompt field.
+4. Upload `seed_examples.jsonl` as seed data; ask Pioneer to
+   generate 500-1000 synthetic examples balanced across the 4
+   intents.
+5. Run the fine-tune (15-45 min on Pioneer infra).
+6. Upload `eval_set.jsonl` as eval split. Targets: intent accuracy
+   >= 0.90, macro NER F1 >= 0.85, both beating base GLiNER2 by 10+
+   points.
+7. Download the fine-tuned weights to
+   `backend/retrieval/router_train/weights/<model-name>/` (gitignored).
+
+**After the fine-tune is done — wire it in:**
+8. `uv add gliner` (intentionally NOT in pyproject.toml; ~700 MB
+   transitive deps via PyTorch + transformers).
+9. Set env vars in your shell / `.env`:
+   - `QONTEXT_ROUTER=gliner2`
+   - `GLINER2_MODEL_PATH="<absolute path to weights dir>"`
+10. Verify:
+    ```
+    QONTEXT_ROUTER=gliner2 GLINER2_MODEL_PATH=... \
+      uv run pytest backend/retrieval/tests/test_router.py::TestGLiNER2EntityRouterIntegration -q
+    ```
+11. Re-run the eval harness with the fine-tuned router live and
+    compare against the previous report under
+    `backend/eval/reports/`. Fill in the eval-results table at the
+    bottom of `router_train/README.md`.
+
+**Pioneer side-challenge submission (€700, best fine-tuned model):**
+The README's last section lists the 4-item submission package
+(Pioneer job link, README, eval delta, integration code).
+
+**Stub fallback meanwhile:** the cascade runs cleanly without any
+of the above — `StubEntityRouter` (regex-based) keeps CI green and
+production booting. Real NER recall on natural-language queries is
+the upgrade you unlock by completing the steps above.
+
+---
+
 ## 2026-04-26 — #4 HybridTier follow-ups (need human action)
 
 1. **Enable real embeddings (BGE-small)**

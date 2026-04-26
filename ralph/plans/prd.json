@@ -37,8 +37,9 @@
         "category": "feat-retrieval",
         "description": "R4 Tier 2 RouterTier (Pioneer.ai GLiNER2). Likely blocked on human fine-tuning.",
         "depends_on": [2],
-        "passes": false,
-        "blocked": false
+        "passes": true,
+        "blocked": false,
+        "notes": "Stub fallback ships; real GLiNER2 fine-tune is human-only on Pioneer.ai (see human-backlog)."
     },
     {
         "issue": 5,

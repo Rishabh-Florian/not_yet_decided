@@ -17,6 +17,13 @@ from .orchestrator import (
     build_default_orchestrator,
     build_orchestrator_with_store,
 )
+from .router import (
+    EntityRouter,
+    GLiNER2EntityRouter,
+    RouterDecision,
+    RouterTier,
+    StubEntityRouter,
+)
 from .tiers import StubTier, Tier
 
 __all__ = [
@@ -25,12 +32,17 @@ __all__ = [
     "Citation",
     "ContextEngine",
     "Embedder",
+    "EntityRouter",
     "ExactTier",
+    "GLiNER2EntityRouter",
     "Hit",
     "HybridTier",
     "QueryContext",
     "QueryResult",
+    "RouterDecision",
+    "RouterTier",
     "StubEmbedder",
+    "StubEntityRouter",
     "StubTier",
     "Tier",
     "TierConfig",

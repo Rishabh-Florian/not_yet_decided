@@ -217,6 +217,86 @@ class TestPreferTier:
             orch.run("q", QueryContext(prefer_tier="ghost"))
 
 
+class TestRouteToDirective:
+    """Pre-route: a tier may emit `route_to` to skip the cascade ahead.
+
+    Honored at most once per query so a misclassification cannot cycle.
+    """
+
+    class _Routing(Tier):
+        def __init__(self, name: str, route_to: str | None) -> None:
+            self._name = name
+            self._route_to = route_to
+            self.calls = 0
+
+        @property
+        def name(self) -> str:
+            return self._name
+
+        def search(self, query: str, ctx: QueryContext) -> QueryResult:
+            self.calls += 1
+            return QueryResult(
+                answer=None,
+                items=[],
+                citations=[],
+                tier_used=self._name,
+                relevance=0.0,
+                latency_ms=0,
+                route_to=self._route_to,
+            )
+
+    def test_route_to_skips_intermediate_tier(self) -> None:
+        router = self._Routing(name="router", route_to="hybrid")
+        skipped = _FixedTier(name="agentic", relevance=1.0)
+        target = _FixedTier(name="hybrid", relevance=1.0)
+        orch = CascadeOrchestrator(
+            tiers=[router, skipped, target],
+            configs=[
+                TierConfig(name="router", escalate_below=0.5),
+                TierConfig(name="agentic", escalate_below=0.5),
+                TierConfig(name="hybrid", escalate_below=0.5),
+            ],
+        )
+        result = orch.run("q", QueryContext())
+        assert result.tier_used == "hybrid"
+        assert skipped.calls == 0
+        assert target.calls == 1
+
+    def test_route_to_unknown_tier_falls_through(self) -> None:
+        router = self._Routing(name="router", route_to="ghost")
+        next_tier = _FixedTier(name="hybrid", relevance=1.0)
+        orch = CascadeOrchestrator(
+            tiers=[router, next_tier],
+            configs=[
+                TierConfig(name="router", escalate_below=0.5),
+                TierConfig(name="hybrid", escalate_below=0.5),
+            ],
+        )
+        result = orch.run("q", QueryContext())
+        # Unknown route_to is ignored; cascade walks to next-in-order.
+        assert result.tier_used == "hybrid"
+        assert next_tier.calls == 1
+
+    def test_route_to_does_not_revisit_already_run_tier(self) -> None:
+        # If the router points back at a tier that already executed
+        # (e.g. `exact`), the directive must be ignored — never cycle.
+        prior = _FixedTier(name="exact", relevance=0.0)
+        router = self._Routing(name="router", route_to="exact")
+        last = _FixedTier(name="hybrid", relevance=1.0)
+        orch = CascadeOrchestrator(
+            tiers=[prior, router, last],
+            configs=[
+                TierConfig(name="exact", escalate_below=0.5),
+                TierConfig(name="router", escalate_below=0.5),
+                TierConfig(name="hybrid", escalate_below=0.5),
+            ],
+        )
+        result = orch.run("q", QueryContext())
+        assert result.tier_used == "hybrid"
+        # exact ran exactly once (its original cascade slot).
+        assert prior.calls == 1
+
+
 class TestDefaultBuilder:
     def test_default_builder_walks_all_tiers(self) -> None:
         a = _FixedTier(name="a", relevance=0.99)
