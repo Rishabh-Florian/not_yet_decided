@@ -37,6 +37,21 @@ Better Context ingests the full EnterpriseBench dataset (email, HR, CRM, IT tick
 
 Requirements: Docker, Python 3.12+, [uv](https://docs.astral.sh/uv/), Node.js 18+.
 
+### Fine-tuned Pioneer models (~22 MB each)
+
+The two production routers (v2 schema for intent, v3 NER-only for
+entities) ship in-repo at `pioneer/weights/inazuma-gliner2-v2/` and
+`pioneer/weights/inazuma-gliner2-ner-v3/`. They're also mirrored on
+Google Drive in case the repo trims them later:
+
+→ <https://drive.google.com/drive/folders/1gH6r4uec2ElQlyXiIszvw8UxmpuQBSnD?usp=drive_link>
+
+If cloning gave you the weights you don't need to do anything. If
+they're missing, download both folders from the Drive link into
+`pioneer/weights/`.
+
+### Bring up the stack
+
 ```sh
 # 1. Install Python deps + start Neo4j
 uv sync
