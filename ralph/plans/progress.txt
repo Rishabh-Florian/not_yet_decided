@@ -27,4 +27,15 @@
 - Notes: tier registration is explicit list + matching TierConfig list (no name-magic); cascade fallback returns last tier's result not error; timeout_ms passed as hint via QueryContext.max_latency_ms.
 - Next: #3 (R1 ExactTier).
 
+### 2026-04-26 — #3 done (R1 ExactTier)
+- backend/retrieval/exact.py: ExactTier(store, *, name, fulltext_limit). Reuses store._driver.
+- backend/retrieval/index.py: ensure_indexes — CREATE FULLTEXT INDEX node_text IF NOT EXISTS on (n:Entity).attributes_json.
+- Cascade wired: build_orchestrator_with_store(store) -> [ExactTier (escalate_below=0.5), StubTier (terminal)].
+- API lifespan now uses build_orchestrator_with_store; storeless path retained for unit tests.
+- Score docstring: id-match=1.0 ("Cypher exact-id"); fulltext score = Lucene BM25-similar squashed via score/(1+score).
+- Tier triggers: id-token regex (emp_\d+, CLNT/CUST/VEND/ORG-\d+, ASIN, UUIDs, ticket|conv|order|sale|product[-_:]\w+); fulltext only if no id + <=4 tokens + no wildcards.
+- Verifiers: ruff clean, pyright 0 errors, pytest 102 passed / 11 RUN_INTEGRATION-skipped.
+- Open: p95 latency acceptance criterion needs RUN_INTEGRATION=1 with populated graph (eval-harness ready).
+- Next: #4 (R2 HybridTier).
+
 ---

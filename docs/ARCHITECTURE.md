@@ -1196,7 +1196,7 @@ Each tier documents which algorithm it uses on its `Hit.score` and
 | Tier | Status | Algorithm | Issue |
 |---|---|---|---|
 | `stub` | LANDED (R0) | always returns 0 hits, relevance 0.0 | #2 |
-| `exact` | pending (R1) | Cypher pattern + fulltext index | #3 |
+| `exact` | LANDED (R1) | Cypher exact id match + Neo4j fulltext (`node_text`, BM25-similar normalized to [0,1)) | #3 |
 | `hybrid` | pending (R2) | vector + fulltext + cross-encoder rerank | #4 |
 | `agentic` | pending (R3) | Gemini function-calling over store ops | #5 |
 

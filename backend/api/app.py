@@ -25,6 +25,7 @@ from backend.retrieval import (
     QueryResult,
     StubTier,
     TierConfig,
+    build_orchestrator_with_store,
 )
 
 from .models import (
@@ -76,8 +77,12 @@ def _edge(e: GraphEdge) -> EdgeResponse:
 
 
 def _build_default_engine() -> ContextEngine:
-    """R0 default engine: a single `StubTier` so `/api/query` is callable
-    end-to-end before R1-R3 land. Real tier wiring lives in those issues.
+    """Stub-only engine for unit tests that bypass the live store.
+
+    Production wiring uses `_build_engine_with_store` from the lifespan,
+    which adds `ExactTier` (R1) as tier 0. This builder remains as a
+    storeless fallback so `/api/query` can be exercised in tests that
+    mock the GraphStore dependency.
     """
     tier = StubTier(name="stub")
     orch = CascadeOrchestrator(
@@ -85,6 +90,11 @@ def _build_default_engine() -> ContextEngine:
         configs=[TierConfig(name="stub", escalate_below=0.0)],
     )
     return ContextEngine(orch)
+
+
+def _build_engine_with_store(store: GraphStore) -> ContextEngine:
+    """Cascade `[ExactTier, StubTier]` — the live `/api/query` engine."""
+    return ContextEngine(build_orchestrator_with_store(store))
 
 
 @asynccontextmanager
@@ -98,7 +108,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         neo4j_database=cfg.NEO4J_DATABASE,
     )
     app.state.store = store
-    app.state.context_engine = _build_default_engine()
+    app.state.context_engine = _build_engine_with_store(store)
     yield
     store.close()
 

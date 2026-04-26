@@ -150,3 +150,40 @@ def build_default_orchestrator(tiers: list[Tier]) -> CascadeOrchestrator:
     # `replace` is a no-op here but documents intent: configs are frozen.
     configs = [replace(c) for c in configs]
     return CascadeOrchestrator(tiers, configs)
+
+
+def build_orchestrator_with_store(store: object) -> CascadeOrchestrator:
+    """Production cascade for `POST /api/query`: `[ExactTier, StubTier]`.
+
+    Tier order:
+      1. `exact`  — Cypher id lookup + Neo4j fulltext (R1, this issue)
+      2. `stub`   — terminal no-op so the cascade always returns a result
+
+    Escalation thresholds:
+      * `exact.escalate_below = 0.5` — id-token hits (`relevance == 1.0`)
+        terminate immediately; weak fulltext hits (normalized BM25 <
+        0.5) escalate to the stub. The 0.5 cutoff corresponds to a raw
+        Lucene score of 1.0 after `score / (1 + score)` normalization.
+      * `stub.escalate_below = 0.0` — terminal: never escalates past.
+
+    `store` is typed as `object` to dodge an import cycle
+    (`backend.graph.store` imports `backend.models`). The runtime check
+    enforces the real type.
+    """
+    # Local imports break the import cycle with backend.graph.store.
+    from backend.graph.store import GraphStore
+
+    from .exact import ExactTier
+    from .tiers import StubTier
+
+    if not isinstance(store, GraphStore):
+        raise TypeError(f"store must be GraphStore, got {type(store).__name__}")
+    exact = ExactTier(store)
+    stub = StubTier(name="stub")
+    return CascadeOrchestrator(
+        tiers=[exact, stub],
+        configs=[
+            TierConfig(name="exact", escalate_below=0.5),
+            TierConfig(name="stub", escalate_below=0.0),
+        ],
+    )

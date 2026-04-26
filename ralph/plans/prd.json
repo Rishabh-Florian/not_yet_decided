@@ -20,7 +20,7 @@
         "category": "feat-retrieval",
         "description": "R1 Tier 1 ExactTier (Cypher + Neo4j fulltext)",
         "depends_on": [2],
-        "passes": false,
+        "passes": true,
         "blocked": false
     },
     {
