@@ -20,6 +20,7 @@
 > | REST API — Edit API (human-in-the-loop) | **done** | `PUT /api/graph/node/{id}` — provenance-tracked edits |
 > | VFS API (ls, cat, grep, find, stat, tree) | not yet | VFS is a logical view (no disk materialization) — endpoints not built |
 > | Search API (semantic + hybrid, Neo4j HNSW) | partial | R0/R1/R2/R3/R4 tiers landed (cascade + Cypher/fulltext + vector+RRF + Pioneer.ai GLiNER2 pre-router + bounded Gemini function-calling agentic tier; LLM client behind a Protocol with stub/noop fallback). Cross-encoder rerank still pending. Embedding population (`backend/retrieval/embed.py`) is a manual one-shot pass. |
+> | Workflow API (frozen-policy retrieval) | **done** | R5a framework + R5b `answer-customer-email` + R5c `thread-summary`. `GET/POST /api/workflow{,/{name}}`. Built-ins registered explicitly at FastAPI startup via `register_builtin_workflows()` (no import-side-effect). |
 > | Conflict resolution engine + UI | not yet | Rule-based + LLM triage designed, not implemented |
 > | MCP server (for Claude / AI agents) | not yet | MCP tool wrappers over existing API |
 > | Web UI (React + Next.js) | not yet | No frontend code |
@@ -1281,9 +1282,12 @@ class level. The framework wraps the live tier set in a `TierRegistry`
 locked to that subset — `registry.get("agentic")` raises if
 `"agentic"` is not in the workflow's `allowed_tiers`. The frozen
 policy is enforced at every tier access, not in the workflow body.
-Workflows are registered via the `@register_workflow` decorator on
-import; `build_workflow(name, tiers_by_name, **extras)` is the
-factory the API endpoint uses.
+Workflow classes still carry the `@register_workflow` decorator, but
+registration is no longer a side-effect of importing the
+`backend.retrieval.workflows` package. The FastAPI lifespan calls
+`register_builtin_workflows()` explicitly at startup; tests that need
+the built-ins call it from a fixture. `build_workflow(name,
+tiers_by_name, **extras)` is the factory the API endpoint uses.
 
 | Workflow | Status | Tiers used | Issue |
 |---|---|---|---|
@@ -1341,8 +1345,10 @@ list[str], messages: list[{author, ts, text}]}`. Empty `messages` →
    a light regex NER. Top 5 hits per query are aggregated; duplicate
    node ids are deduped (best score wins). The result is the "starting
    cluster" of related entity nodes the agent loop can traverse from.
-   Topic-phrase NER beyond raw id tokens is deferred until R4
-   (GLiNER2) lands, per the issue's implementation note.
+   Topic-phrase NER beyond raw id tokens still uses the regex
+   extractor; the swap to R4's GLiNER2 router for richer NER on the
+   thread body is deferred (R4 landed standalone for the cascade router,
+   not yet wired into this workflow).
 2. **Bounded LLM agent loop (less-deterministic).** Same `LLMClient`
    protocol the AgenticTier uses, but with a **narrower 3-tool surface**
    surfaced to the model:
