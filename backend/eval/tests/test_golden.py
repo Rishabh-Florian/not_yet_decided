@@ -212,6 +212,9 @@ class TestLoadGoldenSet:
         path = Path("dataset/EnterpriseBench/tasks.jsonl")
         if not path.is_file():
             pytest.skip(f"dataset not present at {path}")
+        first_line = path.read_text(encoding="utf-8").splitlines()[0].strip()
+        if first_line == "version https://git-lfs.github.com/spec/v1":
+            pytest.skip("dataset is a Git LFS pointer; fetch LFS objects to run this test")
         items = load_golden_set(path, limit=50)
         # Out of 50 the first batch should be substantially populated;
         # we observed ~97% coverage in spot-check, allow plenty of slack.

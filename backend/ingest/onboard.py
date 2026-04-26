@@ -23,6 +23,17 @@ import re
 from pathlib import Path
 from typing import Any
 
+from pydantic import ValidationError
+
+from . import runtime
+from .llm import GeminiClient
+from .spec import (
+    CANONICAL_NODE_TYPES,
+    CANONICAL_RELATION_TYPES,
+    MappingSpec,
+)
+from .store import IngestStore
+
 # A dot-notation JSONPath segment is "safe" only if it's an ASCII identifier.
 # Anything else (spaces, punctuation, leading digit) MUST be bracket-quoted
 # or jsonpath_ng's parser rejects it at runtime.
@@ -46,17 +57,6 @@ def _bracketize_jsonpath(path: str) -> str:
         return "['" + key.replace("'", "\\'") + "']"
 
     return _DOT_SEGMENT.sub(rewrite, path)
-
-from pydantic import ValidationError
-
-from . import runtime
-from .llm import GeminiClient
-from .spec import (
-    CANONICAL_NODE_TYPES,
-    CANONICAL_RELATION_TYPES,
-    MappingSpec,
-)
-from .store import IngestStore
 
 
 log = logging.getLogger("better_context.onboard")
