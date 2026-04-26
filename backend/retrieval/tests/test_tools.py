@@ -360,7 +360,7 @@ class TestToolBoxCall:
 
 
 class TestToolDefinitions:
-    def test_six_tools(self) -> None:
+    def test_registered_tools(self) -> None:
         defs = tool_definitions()
         names = {d.name for d in defs}
         assert names == {
@@ -370,6 +370,12 @@ class TestToolDefinitions:
             "get_node",
             "get_neighbors",
             "get_source_record",
+            "vfs_ls",
+            "vfs_cat",
+            "vfs_stat",
+            "vfs_tree",
+            "vfs_grep",
+            "vfs_find",
         }
 
     def test_each_def_well_formed(self) -> None:

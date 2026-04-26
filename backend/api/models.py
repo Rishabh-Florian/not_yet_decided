@@ -5,29 +5,15 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from backend.models.graph import FactConfidence
+from backend.models.responses import ProvenanceResponse, SourceRecordResponse
 from backend.retrieval.models import QueryContext
 
-
-class ProvenanceResponse(BaseModel):
-    source_file: str
-    source_record_id: str
-    source_field: str
-    extraction_method: str
-    extraction_model: str
-    confidence: FactConfidence
-    raw_value: str
-    model_self_score: float | None = None
-    extracted_at: datetime | None = None
-    spec_version: int | None = None
-
-
-class SourceRecordResponse(BaseModel):
-    source_file: str
-    source_record_id: str
-    raw_record: dict[str, Any]
-    content_hash: str
-    ingested_at: datetime | None = None
+# Re-exported for callers that import these shapes from the API surface.
+__all__ = [
+    "ProvenanceResponse",
+    "SourceRecordResponse",
+    # plus everything defined below
+]
 
 
 class NodeResponse(BaseModel):

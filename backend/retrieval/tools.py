@@ -36,6 +36,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from backend.graph.store import GraphStore, parse_pattern
+from backend.vfs import VFS, DirEntry, FileBody, GrepHit, StatInfo, TreeNode
 
 from ._util import _preview as _attrs_preview
 from .embedder import Embedder
@@ -188,6 +189,9 @@ class ToolBox:
             )
         self._store = store
         self._embedder = embedder
+        # VFS is read-only and stateless; construction is cheap.
+        # Reusing one instance per ToolBox keeps the call site clean.
+        self._vfs = VFS(store)
 
     # ------------------------------------------------------------------
     # Tool 1: pattern_query
@@ -438,6 +442,105 @@ class ToolBox:
         }
 
     # ------------------------------------------------------------------
+    # Tool 7-12: VFS path-style retrieval
+    #
+    # Six thin wrappers around `backend.vfs.VFS`. The VFS owns its own
+    # path validation + canonical-type checks; the wrappers only add
+    # citation accumulation for the AgenticTier's grounded-answer
+    # scoring. Path syntax is fixed at two levels:
+    #     /                    -> root
+    #     /{Type}/             -> directory of nodes of that canonical type
+    #     /{Type}/{node_id}    -> one node
+    # ------------------------------------------------------------------
+
+    def vfs_ls(
+        self,
+        cites: CitationCollector,
+        *,
+        path: str = "/",
+        limit: int = 25,
+        offset: int = 0,
+    ) -> list[DirEntry]:
+        entries = self._vfs.ls(path, limit=limit, offset=offset)
+        for e in entries:
+            if e.kind == "node" and e.node_id:
+                cites.add_node(self._store, e.node_id)
+        return entries
+
+    def vfs_cat(
+        self,
+        cites: CitationCollector,
+        *,
+        path: str,
+    ) -> FileBody:
+        body = self._vfs.cat(path)
+        node_id = body.frontmatter.get("id")
+        if isinstance(node_id, str):
+            cites.add_node(self._store, node_id)
+        # Each linked source record is a unique piece of evidence the
+        # agent surfaced via this `cat` — collect one whole-record
+        # citation per source so the agent's relevance score reflects
+        # what it actually grounded the answer in.
+        for rec in body.raw_evidence:
+            cites.add_source_record(rec.source_file, rec.source_record_id)
+        return body
+
+    def vfs_stat(
+        self,
+        cites: CitationCollector,
+        *,
+        path: str,
+    ) -> StatInfo:
+        info = self._vfs.stat(path)
+        if info.kind == "node" and info.node_id:
+            cites.add_node(self._store, info.node_id)
+        return info
+
+    def vfs_tree(
+        self,
+        cites: CitationCollector,
+        *,
+        path: str = "/",
+        depth: int = 1,
+    ) -> TreeNode:
+        # `tree` is structural — no per-node payload, no citations.
+        # Citations on tree calls would let an agent inflate its
+        # grounded-answer score by traversing without reading; keep it
+        # cite-free on purpose.
+        del cites
+        return self._vfs.tree(path, depth=depth)
+
+    def vfs_grep(
+        self,
+        cites: CitationCollector,
+        *,
+        query: str,
+        path: str = "/",
+        limit: int = 25,
+    ) -> list[GrepHit]:
+        hits = self._vfs.grep(query, path, limit=limit)
+        for h in hits:
+            cites.add_node(self._store, h.node_id)
+        return hits
+
+    def vfs_find(
+        self,
+        cites: CitationCollector,
+        *,
+        path: str = "/",
+        where: dict[str, Any] | None = None,
+        modified_after: str | None = None,
+        limit: int = 25,
+    ) -> list[DirEntry]:
+        entries = self._vfs.find(
+            path, where=where, modified_after=modified_after, limit=limit
+        )
+        for e in entries:
+            if e.node_id:
+                cites.add_node(self._store, e.node_id)
+        return entries
+
+    # ------------------------------------------------------------------
     # Dispatch by name (used by the loop driver)
     # ------------------------------------------------------------------
 
@@ -460,6 +563,12 @@ class ToolBox:
             "get_node": self.get_node,
             "get_neighbors": self.get_neighbors,
             "get_source_record": self.get_source_record,
+            "vfs_ls": self.vfs_ls,
+            "vfs_cat": self.vfs_cat,
+            "vfs_stat": self.vfs_stat,
+            "vfs_tree": self.vfs_tree,
+            "vfs_grep": self.vfs_grep,
+            "vfs_find": self.vfs_find,
         }
         fn = registry.get(name)
         if fn is None:
@@ -578,6 +687,156 @@ def tool_definitions() -> list[ToolDefinition]:
                     "record_id": {"type": "string"},
                 },
                 "required": ["source_file", "record_id"],
+            },
+        ),
+        ToolDefinition(
+            name="vfs_ls",
+            description=(
+                "List the contents of a VFS directory. Path syntax: '/' "
+                "for the canonical-type roots (Person, Organization, "
+                "Document, Message, Event, Asset, Topic), '/{Type}/' to "
+                "list nodes of that canonical type. Returns DirEntry rows "
+                "with type, node_id, and a one-line preview per node."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "VFS path. Default '/'.",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max entries to return (1..100, default 25).",
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "description": "Pagination offset.",
+                    },
+                },
+                "required": [],
+            },
+        ),
+        ToolDefinition(
+            name="vfs_cat",
+            description=(
+                "Read a VFS file: '/{Type}/{node_id}'. Returns the full "
+                "node payload — canonical attributes, neighbors grouped "
+                "by relation type, fact-level provenance, and the "
+                "verbatim source records the facts were extracted from. "
+                "Use this to ground an answer in raw evidence after "
+                "locating a candidate node."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "VFS path of the form '/{Type}/{node_id}'.",
+                    },
+                },
+                "required": ["path"],
+            },
+        ),
+        ToolDefinition(
+            name="vfs_stat",
+            description=(
+                "Metadata-only view of a VFS path. Cheaper than `vfs_cat` "
+                "— no neighbor or source-record join. Returns id, type, "
+                "version, source_files, provenance_count for a node, or "
+                "child_count for a directory."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "VFS path."},
+                },
+                "required": ["path"],
+            },
+        ),
+        ToolDefinition(
+            name="vfs_tree",
+            description=(
+                "Recursive directory listing capped at `depth` (1..3). "
+                "Most useful at '/': depth=1 lists canonical types with "
+                "child counts, depth=2 expands one level into node ids."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "VFS path. Default '/'.",
+                    },
+                    "depth": {
+                        "type": "integer",
+                        "description": "Recursion depth (1..3, default 1).",
+                    },
+                },
+                "required": [],
+            },
+        ),
+        ToolDefinition(
+            name="vfs_grep",
+            description=(
+                "BM25 fulltext search scoped to a VFS subtree. Path '/' "
+                "searches across all nodes; '/{Type}/' restricts to one "
+                "canonical type. Wraps the same `node_text` Lucene index "
+                "the cascade's exact tier uses."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Free-text query.",
+                    },
+                    "path": {
+                        "type": "string",
+                        "description": "VFS scope path. Default '/'.",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max hits (1..100, default 25).",
+                    },
+                },
+                "required": ["query"],
+            },
+        ),
+        ToolDefinition(
+            name="vfs_find",
+            description=(
+                "Filter nodes under a VFS directory by attribute equality "
+                "and/or last-modified time. `where` is a flat dict of "
+                "attribute -> expected value (top-level attrs only); "
+                "`modified_after` is an ISO-8601 datetime cutoff. Pair "
+                "with a '/{Type}/' path to keep the scan bounded."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "VFS scope path. Default '/'.",
+                    },
+                    "where": {
+                        "type": "object",
+                        "description": (
+                            "Attribute equality filter. Keys are top-level "
+                            "attribute names; values are the expected value."
+                        ),
+                    },
+                    "modified_after": {
+                        "type": "string",
+                        "description": "ISO-8601 datetime; only nodes updated "
+                        "at or after this point are returned.",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max entries (1..100, default 25).",
+                    },
+                },
+                "required": [],
             },
         ),
     ]
