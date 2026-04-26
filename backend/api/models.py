@@ -6,6 +6,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from backend.models.graph import FactConfidence
+from backend.retrieval.models import QueryContext
 
 
 class ProvenanceResponse(BaseModel):
@@ -95,3 +96,10 @@ class PatternQueryResponse(BaseModel):
 class EditNodeRequest(BaseModel):
     attributes: dict[str, Any]
     editor: str
+
+
+class QueryRequest(BaseModel):
+    """Request body for `POST /api/query` — the retrieval cascade entrypoint."""
+
+    query: str
+    context: QueryContext | None = None

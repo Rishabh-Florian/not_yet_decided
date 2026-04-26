@@ -35,3 +35,6 @@ out/
 # skills (regenerable from skills-lock.json via skills-install.sh)
 .agents/
 .claude/
+
+# generated eval reports
+backend/eval/reports/

@@ -18,4 +18,13 @@
 - Deviations: backend/retrieval/models.py rename deferred to retrieval issues; Neo4j Cypher migration to drop stale n.confidence/r.confidence on existing live DB not implemented (only new writes are clean).
 - Next: #2 (R0 ContextEngine).
 
+### 2026-04-26 — #2 done (R0 ContextEngine + cascade + eval harness)
+- backend/retrieval/: ContextEngine, CascadeOrchestrator, Tier ABC, StubTier, Pydantic models (QueryResult.relevance, Hit.score — both algorithm-documented per #10).
+- backend/eval/: golden.py (load_golden_set + key-based id extraction, ~97% coverage on tasks.jsonl), harness.py (run_eval, format_report_markdown, CLI __main__).
+- API: POST /api/query wired with default orchestrator (StubTier only; tier impls follow in #3-#6).
+- Verifiers: ruff clean, pyright 0 errors, pytest 70 passed / 8 Neo4j-skipped.
+- backend/eval/reports/ added to .gitignore (generated artifact dir).
+- Notes: tier registration is explicit list + matching TierConfig list (no name-magic); cascade fallback returns last tier's result not error; timeout_ms passed as hint via QueryContext.max_latency_ms.
+- Next: #3 (R1 ExactTier).
+
 ---

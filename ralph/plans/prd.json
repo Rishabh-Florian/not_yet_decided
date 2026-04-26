@@ -12,7 +12,7 @@
         "category": "feat-retrieval",
         "description": "R0 ContextEngine + cascade orchestrator + eval harness. Defines QueryResult.relevance + Hit.score (algorithmic only).",
         "depends_on": [10],
-        "passes": false,
+        "passes": true,
         "blocked": false
     },
     {

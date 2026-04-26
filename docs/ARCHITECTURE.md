@@ -1163,14 +1163,64 @@ GET  /api/vfs/stat?path=/company/people/eng/...   # File metadata (provenance, v
 GET  /api/vfs/tree?path=/company/&depth=2         # Directory tree
 ```
 
-### Search API (hybrid retrieval) -- NOT YET IMPLEMENTED
+### Search API (hybrid retrieval) -- PARTIAL (R0 cascade spine landed, tiers pending)
+
+The retrieval surface is a **single endpoint** backed by a cascade
+orchestrator. Callers POST a query, the orchestrator walks the
+registered tiers in order (fast → slow), and returns the result of the
+first tier whose `relevance` clears its configured `escalate_below`
+threshold. If every tier escalates past, the orchestrator returns the
+last tier's result (best-effort, never an exception).
 
 ```
-POST /api/search                                 # Semantic + keyword search
-  { "query": "...", "scope": "/company/it/", "top_k": 10, "min_confidence": 0.7 }
+POST /api/query
+  { "query": "...", "context": { "prefer_tier": "exact", "max_latency_ms": 500 } }
 
-POST /api/search/graph                           # Graph-enhanced search
-  { "query": "...", "start_entity": "emp_0431", "hops": 2 }
+→ {
+    "answer": "...",                # filled by LLM tiers (R3+); null otherwise
+    "items":  [ { "kind": "node", "id": "...", "score": 0.91, "preview": "..." } ],
+    "citations": [ { "source_file": "...", "source_record_id": "...", ... } ],
+    "tier_used": "hybrid",
+    "relevance": 0.91,              # algorithmic (cosine / BM25 / rerank), per-tier doc'd
+    "latency_ms": 87
+  }
+```
+
+`relevance` and `Hit.score` are algorithmic (cosine sim / BM25 /
+cross-encoder rerank / exact-match indicator) — never magic numbers.
+Each tier documents which algorithm it uses on its `Hit.score` and
+`QueryResult.relevance`.
+
+**Cascade composition** (`backend/retrieval/`):
+
+| Tier | Status | Algorithm | Issue |
+|---|---|---|---|
+| `stub` | LANDED (R0) | always returns 0 hits, relevance 0.0 | #2 |
+| `exact` | pending (R1) | Cypher pattern + fulltext index | #3 |
+| `hybrid` | pending (R2) | vector + fulltext + cross-encoder rerank | #4 |
+| `agentic` | pending (R3) | Gemini function-calling over store ops | #5 |
+
+**Pre-routing** (R4, issue #6 — Pioneer.ai GLiNER2): a router will
+classify the incoming query and pre-populate `QueryContext.prefer_tier`
+so the orchestrator jumps to the right tier on the first try. The hook
+already exists in R0 — `prefer_tier` is honored today.
+
+**Eval harness** (`backend/eval/`):
+
+* `golden.load_golden_set()` extracts `(query, expected_node_ids)`
+  pairs from `dataset/EnterpriseBench/tasks.jsonl`. The first user
+  message is the query; entity ids harvested from subsequent
+  assistant tool-call arguments (`emp_id`, `product_id`, ...) are
+  the expected node ids. Tasks with no extractable id are skipped.
+* `harness.run_eval()` reports recall@5, recall@10, latency p50/p95,
+  per-tier termination counts, and escalation rate. Output is a
+  Markdown table written to `backend/eval/reports/<UTC-timestamp>.md`
+  so successive runs can be diffed.
+
+Run the harness end-to-end:
+
+```
+uv run python -m backend.eval.harness --limit 50
 ```
 
 ### Edit API (human-in-the-loop) -- IMPLEMENTED

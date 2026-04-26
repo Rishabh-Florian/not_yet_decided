@@ -19,6 +19,13 @@ from fastapi.middleware.cors import CORSMiddleware
 import backend.config as cfg
 from backend.graph.store import GraphStore, parse_pattern
 from backend.models.graph import GraphEdge, GraphNode, Provenance
+from backend.retrieval import (
+    CascadeOrchestrator,
+    ContextEngine,
+    QueryResult,
+    StubTier,
+    TierConfig,
+)
 
 from .models import (
     EdgeResponse,
@@ -31,6 +38,7 @@ from .models import (
     PatternQueryRequest,
     PatternQueryResponse,
     ProvenanceResponse,
+    QueryRequest,
     SourceRecordResponse,
     StatsResponse,
 )
@@ -67,6 +75,18 @@ def _edge(e: GraphEdge) -> EdgeResponse:
     )
 
 
+def _build_default_engine() -> ContextEngine:
+    """R0 default engine: a single `StubTier` so `/api/query` is callable
+    end-to-end before R1-R3 land. Real tier wiring lives in those issues.
+    """
+    tier = StubTier(name="stub")
+    orch = CascadeOrchestrator(
+        tiers=[tier],
+        configs=[TierConfig(name="stub", escalate_below=0.0)],
+    )
+    return ContextEngine(orch)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     db_path = os.environ.get("SQLITE_DB", "data/better_context.sqlite")
@@ -78,6 +98,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         neo4j_database=cfg.NEO4J_DATABASE,
     )
     app.state.store = store
+    app.state.context_engine = _build_default_engine()
     yield
     store.close()
 
@@ -100,6 +121,26 @@ app.add_middleware(
 
 def get_store(request: Request) -> GraphStore:
     return request.app.state.store  # type: ignore[no-any-return]
+
+
+def get_context_engine(request: Request) -> ContextEngine:
+    return request.app.state.context_engine  # type: ignore[no-any-return]
+
+
+# ---------- Retrieval API ----------
+
+
+@app.post("/api/query", response_model=QueryResult)
+async def query(
+    body: QueryRequest,
+    engine: ContextEngine = Depends(get_context_engine),
+) -> QueryResult:
+    if not body.query or not body.query.strip():
+        raise HTTPException(400, "query must be a non-empty, non-whitespace string")
+    try:
+        return engine.query(body.query, body.context)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
 
 
 # ---------- Graph API ----------
