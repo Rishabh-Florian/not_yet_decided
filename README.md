@@ -13,7 +13,7 @@ Better Context ingests the full EnterpriseBench dataset (email, HR, CRM, IT tick
 
 2. **Knowledge graph** — Neo4j (nodes + relationships + embeddings) + SQLite (fact-level provenance traces + verbatim raw records). Every attribute traces back to the exact file, field, and original value it came from.
 
-3. **4-tier retrieval cascade** — `exact → router → hybrid → agentic`. The router is a **fine-tuned 205M GLiNER2 SLM** (Pioneer.ai) that beats GPT-4o on intent accuracy (91.1% vs 86.7%), NER F1 (0.394 vs 0.337), and latency (467ms vs 1699ms) — at $0/query.
+3. **4-tier retrieval cascade** — `exact → router → hybrid → agentic`. The router is **two fine-tuned 205M GLiNER2 SLMs** (Pioneer.ai) called in parallel via `TwoModelEntityRouter`: v2 schema for intent (**0.978 acc**, beats GPT-4o by +11 pp), v3 NER-only for entities (**0.851 macro F1**, beats v2's joint NER head by +42 pp by training NER in isolation). Both at $0/query.
 
 4. **Virtual file system (VFS)** — Unix-style `ls / cat / grep / find / stat / tree` over the graph. Surfaced as Gemini function-calling tools for AI agents. No disk materialization — derived at query time from `(canonical_type, node_id)`.
 
@@ -28,7 +28,7 @@ Better Context ingests the full EnterpriseBench dataset (email, HR, CRM, IT tick
 | Technology | How it's used |
 |------------|--------------|
 | **Google Gemini (DeepMind)** | Onboarding: LLM drafts MappingSpec YAMLs from data samples. AgenticTier: bounded Gemini function-calling loop (6 tools, max 6 calls). Workflows: thread-summary + answer-customer-email compose. |
-| **Pioneer.ai (Fastino)** | Fine-tuned 205M GLiNER2 SLM for 4-way intent classification + 6-type NER in a single forward pass. Round 1: 91.1% intent / 0.394 NER F1 / 467ms p95. Beats GPT-4o on all three metrics. |
+| **Pioneer.ai (Fastino)** | **Two** fine-tuned 205M GLiNER2 SLMs powering the production router. **v2 schema** (Round 2) for intent: 0.978 acc — beats GPT-4o (0.867) by +11 pp. **v3 NER-only** (Round 3) for entities: 0.851 macro F1 — beats v2's joint NER head (0.430) by +42 pp by training NER alone on a templated dataset built from real graph entities (per-entity: emp_id 1.00, customer_id 0.94, ticket_id 0.91, date 0.92, dept 0.86, product 0.47). Both LoRA adapters (~11 MB each) shipped at `pioneer/weights/`. |
 | **Neo4j** | Primary graph store. Native HNSW vector indexes for hybrid search. Fulltext indexes for BM25-like ranking. MERGE-on-id dedup with deterministic edge IDs. |
 
 ---
@@ -67,10 +67,11 @@ NEO4J_DATABASE=neo4j
 GEMINI_API_KEY=<get from https://aistudio.google.com/apikey>
 BETTER_CONTEXT_AGENTIC=gemini
 BETTER_CONTEXT_EMBEDDER=bge
-BETTER_CONTEXT_ROUTER=gliner2
-GLINER2_MODEL_PATH=pioneer/weights/inazuma-gliner2-v2
+BETTER_CONTEXT_ROUTER=two-model
+PIONEER_INTENT_MODEL_ID=683f9b1f-db87-4eba-9cf8-719b1350251d  # v2 schema (intent)
+PIONEER_NER_MODEL_ID=ee1a87ae-2611-4eed-9f66-64437d40e0bb    # v3 NER-only (entities)
 PIONEER_API_KEY=<from https://agent.pioneer.ai → API Keys>
-PIONEER_MODEL_ID=683f9b1f-dcbe-4162-89e6-f46a155882a1
+# Fallback: BETTER_CONTEXT_ROUTER=gliner2 + GLINER2_MODEL_PATH=pioneer/weights/inazuma-gliner2-v2 (single-model)
 EOF
 
 # 3. Ingest all 14 data sources
@@ -121,7 +122,7 @@ data/               Runtime SQLite db (gitignored)
 - **Identity resolution** — deterministic email-match → `SAME_AS` edges (preserves per-source provenance, no merge).
 - **REST API** — 12 endpoints (see table below). FastAPI + Pydantic v2 models generate the OpenAPI spec.
 - **4-tier retrieval cascade** — `exact → router → hybrid → agentic → stub`. Tiers escalate on algorithmic relevance only. Router pre-routes via fine-tuned GLiNER2 SLM.
-- **Fine-tuned Pioneer router** — 205M GLiNER2, multi-task (4-way intent + 6-type NER, single forward pass). Round 1: 91.1% intent / 0.394 NER F1 / 467ms p95 — beats GPT-4o (86.7% / 0.337 / 1699ms) at $0/query.
+- **Fine-tuned Pioneer router** — `TwoModelEntityRouter` calls two GLiNER2 LoRA adapters in parallel via threadpool. **v2 schema** for intent: 0.978 acc (beats GPT-4o 0.867 by +11 pp). **v3 NER-only** for entities: 0.851 macro F1 (beats joint v2 NER 0.430 by +42 pp by training NER in isolation; per-entity emp_id 1.00, customer_id 0.94, ticket_id 0.91, date 0.92, dept 0.86, product 0.47). Total p95 ≈ max of the two calls. Full eval tables in [`pioneer/bench/results/comparison.md`](pioneer/bench/results/comparison.md); architecture rationale in [`pioneer/MODELS.md`](pioneer/MODELS.md).
 - **Hybrid search** — Neo4j HNSW vector + fulltext, Reciprocal Rank Fusion (k=60).
 - **Agentic tier** — bounded Gemini function-calling loop (6 tools, max 6 calls, 10s wall-clock).
 - **VFS** — 6 pure-Cypher operations (`ls/cat/stat/grep/find/tree`), surfaced as Gemini function-calling tools for AI agents.
