@@ -122,7 +122,6 @@ class LLMExtraction(_Strict):
     output_node_rule: str | None = None
     output_edge_rule: str | None = None
     cache_key: list[str]
-    confidence_floor: float = 0.7
     require_grounding: bool = True
     max_extractions_per_record: int = 50
     model: str = "gemini-2.5-flash"

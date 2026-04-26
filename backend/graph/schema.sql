@@ -43,7 +43,9 @@ CREATE TABLE IF NOT EXISTS provenance (
     extraction_method TEXT NOT NULL,
     extraction_model  TEXT NOT NULL,
     extracted_at      TEXT NOT NULL,
-    confidence        REAL NOT NULL,
+    confidence        TEXT NOT NULL
+        CHECK (confidence IN ('exact','grounded','inferred','human')),
+    model_self_score  REAL,                          -- LLM self-rated number, audit-only
     raw_value         TEXT NOT NULL,
     spec_version      INTEGER,                       -- mapping_specs.version, NULL for human/legacy
     CHECK ((node_id IS NOT NULL) <> (edge_id IS NOT NULL)),

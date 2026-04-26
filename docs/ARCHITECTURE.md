@@ -189,7 +189,7 @@ per-record path for structured data.
    │                          (last-write-wins attrs, prov appends)│
    │     apply EdgeRules    → MERGE on sha256(src|rel|tgt)        │
    │     run LLMExtraction blocks (opt-in, cached, grounded,      │
-   │                              confidence_floor, capped)        │
+   │                              capped)                           │
    │                       │                                      │
    │            failure on this record → dead_letter, continue    │
    │                                                              │
@@ -227,10 +227,12 @@ bounded uses only:
    2.5 ONCE per (tenant, source-file). Output: a YAML `MappingSpec`.
 2. **Opt-in extraction on explicitly unstructured fields** — `LLMExtraction`
    blocks declared in the spec (e.g. email-body → `MENTIONS`). Cached by
-   `cache_key`, gated by `confidence_floor`, grounded against the source
-   span (`require_grounding: true` rejects pure hallucinations), capped by
-   `max_extractions_per_record`. A spec with no `llm_blocks` ⇒ zero LLM
-   calls during ingestion.
+   `cache_key`, grounded against the source span (`require_grounding: true`
+   rejects items whose `surface_form` does not appear verbatim in the input),
+   capped by `max_extractions_per_record`. The LLM's self-rated `confidence`
+   number is captured into `Provenance.model_self_score` for audit but is
+   never used to filter or threshold facts (see "Provenance confidence" below).
+   A spec with no `llm_blocks` ⇒ zero LLM calls during ingestion.
 3. **One-shot self-repair on drafted specs** — if pydantic validation of a
    Gemini-drafted spec fails, the validator error is sent back ONCE for
    repair.
@@ -287,7 +289,6 @@ llm_blocks:                     # optional, opt-in only
     input_source: $.body
     prompt_template: "Extract Person/Organization/Topic references from this email body..."
     output_schema: { type: object, properties: {...} }
-    confidence_floor: 0.7
     require_grounding: true
     max_extractions_per_record: 50
     cache_key: ["$.email_id"]
@@ -605,7 +606,6 @@ class GraphNode:
     provenance: list[Provenance]  # one per source that contributed
     created_at: datetime
     updated_at: datetime
-    confidence: float          # 0.0–1.0
     version: int               # incremented on each update
     vfs_path: str              # path in the virtual file system
 ```
@@ -621,7 +621,6 @@ class GraphEdge:
     relation_type: str         # "REPORTS_TO", "PURCHASED", etc.
     attributes: dict           # edge-specific data (e.g., date, amount)
     provenance: list[Provenance]
-    confidence: float
     valid_from: datetime       # temporal validity
     valid_to: datetime | None  # None = still valid
     version: int
@@ -635,12 +634,35 @@ class Provenance:
     source_file: str           # "Enterprise_mail_system/emails.json"
     source_record_id: str      # "email_id:4226322d-0ea5-..."
     source_field: str          # "sender_emp_id"
-    extraction_method: str     # "direct_mapping" | "llm_extraction" | "rule_based"
+    extraction_method: str     # "direct_mapping" | "llm_extraction" | "rule_based" | "human"
     extraction_model: str      # "claude-sonnet-4-6" or "rule:email_parser_v1"
     extracted_at: datetime
-    confidence: float
+    confidence: FactConfidence # categorical: exact | grounded | inferred | human
+    model_self_score: float | None  # LLM self-rated, audit-only; never used to filter
     raw_value: str             # the original value before normalization
 ```
+
+**Provenance confidence — grounded, not fabricated.**
+A confidence value is never a magic number. It is always grounded in a real
+computation, deterministic rule, or human action. If we don't have an
+algorithm, we use a categorical label — not a fabricated float. The
+`FactConfidence` enum captures the four producers we actually have:
+
+| Label       | Producer                                                                 |
+|-------------|--------------------------------------------------------------------------|
+| `exact`     | direct field mapping or deterministic rule (e.g. identity-by-email)      |
+| `grounded`  | LLM extraction whose `surface_form` was found verbatim in the input span |
+| `inferred`  | LLM extraction without a grounding match (free generation)               |
+| `human`     | human edit / override via the Edit API                                   |
+
+The LLM's self-rated `confidence` number is captured into
+`Provenance.model_self_score` (audit-only) so a future calibration study
+has the raw signal, but it is **never** used for filtering, thresholding,
+or routing — uncalibrated self-scores are theatre. Aggregation policies
+on the `:Entity` / edge level are caller-defined ("all `exact`", "any
+`inferred`", etc.); there is no node-level `confidence` field anymore.
+Retrieval relevance (cosine similarity, BM25, rerank score) is a separate
+concept and lives on retrieval result objects, not on `Provenance`.
 
 **Graph statistics (estimated for this dataset):**
 

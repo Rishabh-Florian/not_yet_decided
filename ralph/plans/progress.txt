@@ -1,9 +1,21 @@
 # Progress Log
 
-## Session [DATE]
+## Session 2026-04-26 (manual ralph mode — Claude Code session as orchestrator)
 
 ### Status
-- Branch: [BRANCH]
-- Notes: [what was done, blockers, next steps]
+- Branch: main
+- Order: #10 -> #2 -> #3 -> #4 -> #6 -> #5 -> #7 -> #8 -> #9
+- Mode: subagent per issue, Opus orchestrator verifies
+
+### 2026-04-26 — #10 done (provenance refactor)
+- FactConfidence StrEnum (exact/grounded/inferred/human) replaces float on Provenance.
+- model_self_score: float | None added (audit-only, never used for filtering).
+- GraphNode.confidence + GraphEdge.confidence dropped entirely.
+- LLMExtraction.confidence_floor dropped; require_grounding is the only LLM gate.
+- SQLite migration 001_confidence_enum.py: idempotent table-rebuild; legacy llm_extraction rows mapped to 'grounded' (require_grounding gate already enforced upstream); raw float preserved into model_self_score.
+- Edit API now writes FactConfidence.HUMAN.
+- Verifiers: ruff clean, pyright 0 errors, pytest 22 passed / 8 Neo4j-gated skipped.
+- Deviations: backend/retrieval/models.py rename deferred to retrieval issues; Neo4j Cypher migration to drop stale n.confidence/r.confidence on existing live DB not implemented (only new writes are clean).
+- Next: #2 (R0 ContextEngine).
 
 ---

@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from typing import Iterable
 
 from backend.graph.store import GraphStore
-from backend.models.graph import GraphEdge, Provenance
+from backend.models.graph import FactConfidence, GraphEdge, Provenance
 
 from .runtime import get_transformer
 
@@ -61,11 +61,10 @@ class IdentityResolver:
                         source_field="email",
                         extraction_method="rule_based",
                         extraction_model="rule:identity_email_v1",
-                        confidence=1.0,
+                        confidence=FactConfidence.EXACT,
                         raw_value=email,
                         extracted_at=datetime.now(timezone.utc),
                     )],
-                    confidence=1.0,
                     valid_from=None,
                 )
                 # Provenance has a FK to source_records, so we need a stub

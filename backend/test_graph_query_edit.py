@@ -15,6 +15,7 @@ import pytest
 
 from backend.graph.store import GraphStore, parse_pattern
 from backend.ingest.spec import CANONICAL_NODE_TYPES, CANONICAL_RELATION_TYPES
+from backend.models.graph import FactConfidence
 
 
 # ---------------------------------------------------------------------------
@@ -158,7 +159,7 @@ class TestEditNodeIntegration:
             assert len(human_prov) >= 1
             latest = human_prov[-1]
             assert latest.extraction_model == "human:test_editor"
-            assert latest.confidence == 1.0
+            assert latest.confidence == FactConfidence.HUMAN
             assert latest.source_field == "title"
             assert latest.raw_value == "Test Title"
             assert latest.spec_version is None
@@ -331,12 +332,11 @@ class TestEditNodeEndpoint:
                     source_field="title",
                     extraction_method="human",
                     extraction_model="human:test_editor",
-                    confidence=1.0,
+                    confidence=FactConfidence.HUMAN,
                     raw_value="Engineer",
                     spec_version=None,
                 )
             ],
-            confidence=1.0,
             vfs_path="/Person/test",
             version=3,
         )
@@ -354,5 +354,6 @@ class TestEditNodeEndpoint:
             assert data["version"] == 3
             assert len(data["provenance"]) == 1
             assert data["provenance"][0]["extraction_method"] == "human"
+            assert data["provenance"][0]["confidence"] == "human"
         finally:
             app.dependency_overrides.clear()
