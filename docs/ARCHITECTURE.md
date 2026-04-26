@@ -19,7 +19,8 @@
 > | REST API — Graph pattern query | **done** | `POST /api/graph/query` — typed pattern DSL |
 > | REST API — Edit API (human-in-the-loop) | **done** | `PUT /api/graph/node/{id}` — provenance-tracked edits |
 > | VFS API (ls, cat, grep, find, stat, tree) | not yet | VFS is a logical view (no disk materialization) — endpoints not built |
-> | Search API (semantic + hybrid, Neo4j HNSW) | not yet | Vector index architecture designed, endpoints not built |
+> | Search API (semantic + hybrid, Neo4j HNSW) | partial | R0/R1/R2/R3/R4 tiers landed (cascade + Cypher/fulltext + vector+RRF + Pioneer.ai GLiNER2 pre-router + bounded Gemini function-calling agentic tier; LLM client behind a Protocol with stub/noop fallback). Cross-encoder rerank still pending. Embedding population (`backend/retrieval/embed.py`) is a manual one-shot pass. |
+> | Workflow API (frozen-policy retrieval) | **done** | R5a framework + R5b `answer-customer-email` + R5c `thread-summary`. `GET/POST /api/workflow{,/{name}}`. Built-ins registered explicitly at FastAPI startup via `register_builtin_workflows()` (no import-side-effect). |
 > | Conflict resolution engine + UI | not yet | Rule-based + LLM triage designed, not implemented |
 > | MCP server (for Claude / AI agents) | not yet | MCP tool wrappers over existing API |
 > | Web UI (React + Next.js) | not yet | No frontend code |
@@ -189,7 +190,7 @@ per-record path for structured data.
    │                          (last-write-wins attrs, prov appends)│
    │     apply EdgeRules    → MERGE on sha256(src|rel|tgt)        │
    │     run LLMExtraction blocks (opt-in, cached, grounded,      │
-   │                              confidence_floor, capped)        │
+   │                              capped)                           │
    │                       │                                      │
    │            failure on this record → dead_letter, continue    │
    │                                                              │
@@ -227,13 +228,20 @@ bounded uses only:
    2.5 ONCE per (tenant, source-file). Output: a YAML `MappingSpec`.
 2. **Opt-in extraction on explicitly unstructured fields** — `LLMExtraction`
    blocks declared in the spec (e.g. email-body → `MENTIONS`). Cached by
-   `cache_key`, gated by `confidence_floor`, grounded against the source
-   span (`require_grounding: true` rejects pure hallucinations), capped by
-   `max_extractions_per_record`. A spec with no `llm_blocks` ⇒ zero LLM
-   calls during ingestion.
-3. **One-shot self-repair on drafted specs** — if pydantic validation of a
-   Gemini-drafted spec fails, the validator error is sent back ONCE for
-   repair.
+   `cache_key`, grounded against the source span (`require_grounding: true`
+   rejects items whose `surface_form` does not appear verbatim in the input),
+   capped by `max_extractions_per_record`. The LLM's self-rated `confidence`
+   number is captured into `Provenance.model_self_score` for audit but is
+   never used to filter or threshold facts (see "Provenance confidence" below).
+   A spec with no `llm_blocks` ⇒ zero LLM calls during ingestion.
+3. **Bounded self-repair on drafted specs** — `Onboarder.draft_spec`
+   injects a hand-written reference spec (`emails.yaml`) as a few-shot
+   example, applies boundary normalization to the parsed JSON
+   (`Onboarder._normalize_llm_output`: drops `when: {}`, forces
+   `required: false`, JSONPath-bracket-quotes keys with non-identifier
+   chars, rewrites bare `id_required_fields` names to JSONPaths), then
+   pydantic-validates. On failure the validator error is fed back to
+   Gemini for up to 3 repair rounds.
 
 Explicitly **not** used as a fallback:
 - Missing required field → record goes to `dead_letter`, never to an LLM
@@ -287,7 +295,6 @@ llm_blocks:                     # optional, opt-in only
     input_source: $.body
     prompt_template: "Extract Person/Organization/Topic references from this email body..."
     output_schema: { type: object, properties: {...} }
-    confidence_floor: 0.7
     require_grounding: true
     max_extractions_per_record: 50
     cache_key: ["$.email_id"]
@@ -605,7 +612,6 @@ class GraphNode:
     provenance: list[Provenance]  # one per source that contributed
     created_at: datetime
     updated_at: datetime
-    confidence: float          # 0.0–1.0
     version: int               # incremented on each update
     vfs_path: str              # path in the virtual file system
 ```
@@ -621,7 +627,6 @@ class GraphEdge:
     relation_type: str         # "REPORTS_TO", "PURCHASED", etc.
     attributes: dict           # edge-specific data (e.g., date, amount)
     provenance: list[Provenance]
-    confidence: float
     valid_from: datetime       # temporal validity
     valid_to: datetime | None  # None = still valid
     version: int
@@ -635,12 +640,35 @@ class Provenance:
     source_file: str           # "Enterprise_mail_system/emails.json"
     source_record_id: str      # "email_id:4226322d-0ea5-..."
     source_field: str          # "sender_emp_id"
-    extraction_method: str     # "direct_mapping" | "llm_extraction" | "rule_based"
+    extraction_method: str     # "direct_mapping" | "llm_extraction" | "rule_based" | "human"
     extraction_model: str      # "claude-sonnet-4-6" or "rule:email_parser_v1"
     extracted_at: datetime
-    confidence: float
+    confidence: FactConfidence # categorical: exact | grounded | inferred | human
+    model_self_score: float | None  # LLM self-rated, audit-only; never used to filter
     raw_value: str             # the original value before normalization
 ```
+
+**Provenance confidence — grounded, not fabricated.**
+A confidence value is never a magic number. It is always grounded in a real
+computation, deterministic rule, or human action. If we don't have an
+algorithm, we use a categorical label — not a fabricated float. The
+`FactConfidence` enum captures the four producers we actually have:
+
+| Label       | Producer                                                                 |
+|-------------|--------------------------------------------------------------------------|
+| `exact`     | direct field mapping or deterministic rule (e.g. identity-by-email)      |
+| `grounded`  | LLM extraction whose `surface_form` was found verbatim in the input span |
+| `inferred`  | LLM extraction without a grounding match (free generation)               |
+| `human`     | human edit / override via the Edit API                                   |
+
+The LLM's self-rated `confidence` number is captured into
+`Provenance.model_self_score` (audit-only) so a future calibration study
+has the raw signal, but it is **never** used for filtering, thresholding,
+or routing — uncalibrated self-scores are theatre. Aggregation policies
+on the `:Entity` / edge level are caller-defined ("all `exact`", "any
+`inferred`", etc.); there is no node-level `confidence` field anymore.
+Retrieval relevance (cosine similarity, BM25, rerank score) is a separate
+concept and lives on retrieval result objects, not on `Provenance`.
 
 **Graph statistics (estimated for this dataset):**
 
@@ -1141,14 +1169,259 @@ GET  /api/vfs/stat?path=/company/people/eng/...   # File metadata (provenance, v
 GET  /api/vfs/tree?path=/company/&depth=2         # Directory tree
 ```
 
-### Search API (hybrid retrieval) -- NOT YET IMPLEMENTED
+### Search API (hybrid retrieval) -- LANDED (R0/R1/R2/R3/R4)
+
+The retrieval surface is a **single endpoint** backed by a cascade
+orchestrator. Callers POST a query, the orchestrator walks the
+registered tiers in order (fast → slow), and returns the result of the
+first tier whose `relevance` clears its configured `escalate_below`
+threshold. If every tier escalates past, the orchestrator returns the
+last tier's result (best-effort, never an exception).
 
 ```
-POST /api/search                                 # Semantic + keyword search
-  { "query": "...", "scope": "/company/it/", "top_k": 10, "min_confidence": 0.7 }
+POST /api/query
+  { "query": "...", "context": { "prefer_tier": "exact", "max_latency_ms": 500 } }
 
-POST /api/search/graph                           # Graph-enhanced search
-  { "query": "...", "start_entity": "emp_0431", "hops": 2 }
+→ {
+    "answer": "...",                # filled by LLM tiers (R3+); null otherwise
+    "items":  [ { "kind": "node", "id": "...", "score": 0.91, "preview": "..." } ],
+    "citations": [ { "source_file": "...", "source_record_id": "...", ... } ],
+    "tier_used": "hybrid",
+    "relevance": 0.91,              # algorithmic (cosine / BM25 / rerank), per-tier doc'd
+    "latency_ms": 87
+  }
+```
+
+`relevance` and `Hit.score` are algorithmic (cosine sim / BM25 /
+cross-encoder rerank / exact-match indicator) — never magic numbers.
+Each tier documents which algorithm it uses on its `Hit.score` and
+`QueryResult.relevance`.
+
+**Cascade composition** (`backend/retrieval/`):
+
+| Tier | Status | Algorithm | Issue |
+|---|---|---|---|
+| `exact` | LANDED (R1) | Cypher exact id match + Neo4j fulltext (`node_text`, BM25-similar normalized to [0,1)) | #3 |
+| `router` | LANDED (R4) | Pioneer.ai GLiNER2 multi-task (intent classification + NER) — pre-routes to T1 (lookup), T3 (search), or T4 (analytical); abstains otherwise | #6 |
+| `hybrid` | LANDED (R2) | Neo4j HNSW vector + fulltext (`node_text`) fused by Reciprocal Rank Fusion (k=60), normalized by max possible RRF | #4 |
+| `agentic` | LANDED (R3) | Bounded Gemini function-calling loop (max 6 calls, 10s wall-clock); algorithmic relevance ∈ {0.0 failed, 0.3 ungrounded, 0.7 grounded ≥1 citation} | #5 |
+| `stub` | LANDED (R0) | always returns 0 hits, relevance 0.0 (terminal fallback) | #2 |
+
+**Default cascade order:** `[exact, router, hybrid, agentic, stub]`.
+Production factory `build_orchestrator_with_store(store)` wires this.
+Router sits between exact and hybrid: pure id queries (`emp_1002`)
+hit the cheap ExactTier regex first; only on a miss does the GLiNER2
+pre-route fire, adding NER recall on natural-language queries.
+Agentic sits after hybrid because its 10s wall-clock budget makes it
+the most expensive tier — the intended entry path is the router's
+`route_to="agentic"` directive on `analytical` intent (multi-hop
+queries), not cascade fallthrough.
+
+**Pre-route directive.** A tier may set `QueryResult.route_to=<tier>`
+to skip the cascade ahead. Honored at most once per query so a router
+misclassification cannot cycle. RouterTier emits `route_to="hybrid"`
+on `search` intent and `route_to="agentic"` on `analytical`. On
+`lookup` intent it inline-delegates to ExactTier and returns
+ExactTier's hits verbatim (re-tagged `tier_used="router"`); on
+`ambiguous` it abstains with no directive and the cascade falls
+through to the next slot. The earlier `QueryContext.prefer_tier` hook
+also still works — it lets the *caller* (not a tier) reorder the
+cascade up-front.
+
+**Embedder backend** (HybridTier vector arm). Hidden behind the
+`Embedder` Protocol:
+- `StubEmbedder` (default) — deterministic hash-based vector with NO
+  semantic signal. Keeps CI green and the cascade booting; HybridTier
+  vector arm contributes nothing.
+- `BgeSmallEmbedder` (production) — `BAAI/bge-small-en-v1.5` via the
+  bundled `sentence-transformers`. Selected by `QONTEXT_EMBEDDER=bge`.
+  Requires a one-shot offline pass to populate `:Entity.vector`:
+  `uv run python -m backend.retrieval.embed [--limit N] [--node-type T]`
+  (idempotent, skips already-embedded). Without the pass the vector
+  index returns nothing and HybridTier degenerates to fulltext-only.
+
+**Router backend.** Hidden behind the `EntityRouter` Protocol:
+- `StubEntityRouter` (default) — deterministic regex classifier; no
+  model dependency. Keeps CI green and the cascade booting on
+  machines without the fine-tune.
+- `GLiNER2EntityRouter` (production) — loads weights from
+  `GLINER2_MODEL_PATH` (local) or `PIONEER_AI_MODEL_ID` (Pioneer
+  endpoint). Fail-fast if neither is set. Selected by
+  `QONTEXT_ROUTER=gliner2`. Requires `uv add gliner` and the
+  Pioneer.ai fine-tune (see
+  `backend/retrieval/router_train/README.md`).
+
+**AgenticTier backend.** Hidden behind the `LLMClient` Protocol
+(mirrors how `Embedder` and `EntityRouter` are isolated):
+- `NoopLLMClient` (default) — single fixed marker text; the cascade
+  returns a typed result on the rare fallthrough path but escalates
+  past to `stub` (relevance 0.3 < 0.5 floor). No network.
+- `StubLLMClient` (tests) — scripted `LLMTurn` list, deterministic;
+  used to exercise the loop driver, iteration cap, tool-error
+  passthrough, and grounded/ungrounded scoring without calling out.
+- `GeminiLLMClient` (production) — `gemini-2.5-flash` via
+  `google-genai`. Fail-fast on missing `GEMINI_API_KEY`. Selected by
+  `QONTEXT_AGENTIC=gemini`. Six tools surfaced via
+  `function_declarations`: `pattern_query` (typed DSL — wraps
+  `GraphStore.pattern_query` and validates against the canonical
+  registry; no free-form Cypher), `fulltext_search`, `vector_search`,
+  `get_node`, `get_neighbors`, `get_source_record`. Tool errors
+  surface back to the model as the next-turn function-response
+  payload (no crash). `Hit.score`/`relevance` are algorithmic, NOT
+  the agent's self-rating: 0.7 if final answer + ≥1 unique citation,
+  0.3 if answer + 0 citations, 0.0 on overshoot/timeout/exception.
+  Citations are deduplicated on `(source_file, source_record_id,
+  source_field)` so the score reflects unique evidence, not call
+  count.
+
+**Workflow API (frozen-policy retrieval)** -- LANDED (R5a + R5b + R5c)
+
+Cascade is the right default for ad-hoc queries. Some flows have a
+known shape — the answer-customer-email flow always wants
+customer + tickets/sales + product context; the thread-summary flow
+always wants T3 cluster recall plus a tightly-bounded T4 traversal.
+Hard-coding the recipe per workflow cuts latency and cost
+predictably (no escalation logic, no router pre-pass) and lets the
+LLM do only what it's good at: drafting natural language (deterministic
+workflows) or making bounded retrieval decisions (less-deterministic
+workflows) over a frozen tier subset.
+
+```
+GET  /api/workflow                                      # discovery: registered workflow names
+POST /api/workflow/{name}                               # invoke a registered workflow
+  body: { "payload": {...workflow-specific...},
+          "ctx": {...QueryContext...} }
+→ WorkflowResult (extends QueryResult with `workflow` + `extras`)
+```
+
+A workflow declares `name` and `allowed_tiers: frozenset[str]` at
+class level. The framework wraps the live tier set in a `TierRegistry`
+locked to that subset — `registry.get("agentic")` raises if
+`"agentic"` is not in the workflow's `allowed_tiers`. The frozen
+policy is enforced at every tier access, not in the workflow body.
+Workflow classes still carry the `@register_workflow` decorator, but
+registration is no longer a side-effect of importing the
+`backend.retrieval.workflows` package. The FastAPI lifespan calls
+`register_builtin_workflows()` explicitly at startup; tests that need
+the built-ins call it from a fixture. `build_workflow(name,
+tiers_by_name, **extras)` is the factory the API endpoint uses.
+
+| Workflow | Status | Tiers used | Issue |
+|---|---|---|---|
+| `answer-customer-email` | LANDED (R5b) | `exact` (sender lookup + neighbor traversal) + `hybrid` (product semantic search) + LLM compose (single-shot, `tools=[]`) | #8 |
+| `thread-summary` | LANDED (R5c) | `hybrid` (T3 starting cluster from participants + regex-NER id tokens) + bounded LLM agent loop (3-tool subset: `get_node` / `get_neighbors` / `get_source_record`, ≤ 6 tool calls) | #9 |
+
+**`answer-customer-email` recipe** (`backend/retrieval/workflows/customer_email.py`):
+
+1. **T1 / ExactTier** — query the lowercased `from_address`.
+   ExactTier's id-token regex won't match a plain email, so it falls
+   through to the Lucene fulltext index over `node_text` and recovers
+   any node carrying that email in an indexed field. **Miss → abort
+   early** with `relevance=0.0`, `extras.reason="unknown_sender"`,
+   no LLM call.
+2. **T1 / GraphStore.neighbors** — one-hop traversal around the
+   resolved sender node id, capped at 25 neighbors so a hub customer
+   doesn't blow the compose prompt. Each neighbor becomes a `Hit`
+   with `score=1.0` (direct graph adjacency, not retrieval ranking).
+3. **T3 / HybridTier** — RRF-fused vector + BM25 search over the
+   email body; top 5 hits land as candidate products.
+4. **LLM compose** — single-shot call through the same `LLMClient`
+   protocol AgenticTier uses, but with `tools=[]` (no function
+   calling — the LLM cannot reach back into the cascade). The prompt
+   is a structured brief assembled from steps 1–3, with explicit
+   instruction to cite by node id using `[node:<id>]` markers and to
+   only cite ids that appear in the brief.
+
+`allowed_tiers = frozenset({"exact", "hybrid"})` — `agentic` is
+intentionally excluded so the path stays under the issue's p95 ≤ 2s
+budget. The compose LLM is allowed for natural-language drafting
+only; routing and tool selection remain deterministic.
+
+The `WorkflowResult.tier_used` is set to `"exact"` (the spine of the
+recipe — the customer match drives the result's relevance). `extras`
+carries `{from_address, sender_node_id, related_count,
+product_candidate_count}` for diagnostics. Citations are accumulated
+across steps 1–3 and deduplicated on
+`(source_file, source_record_id, source_field)` so the UI sees one
+row per piece of evidence.
+
+**`thread-summary` recipe** (`backend/retrieval/workflows/thread_summary.py`):
+
+Less-deterministic counterpart to `answer-customer-email`. Conversation
+threads (Slack, meeting transcripts, email threads) are unstructured —
+variable participants, implicit context, off-topic detours — so the
+recipe pairs deterministic recall with a bounded LLM-driven traversal.
+
+Input shape: `{kind: "meeting"|"slack"|"email_thread", participants:
+list[str], messages: list[{author, ts, text}]}`. Empty `messages` →
+`relevance=0.0`, no LLM call (issue acceptance criterion).
+
+1. **T3 / HybridTier (deterministic recall).** RRF over (a) every
+   participant string verbatim and (b) every id token (`emp_NNNN` /
+   `cust_NNNN` / `prod_NNNN` / ...) extracted from the message text by
+   a light regex NER. Top 5 hits per query are aggregated; duplicate
+   node ids are deduped (best score wins). The result is the "starting
+   cluster" of related entity nodes the agent loop can traverse from.
+   Topic-phrase NER beyond raw id tokens still uses the regex
+   extractor; the swap to R4's GLiNER2 router for richer NER on the
+   thread body is deferred (R4 landed standalone for the cascade router,
+   not yet wired into this workflow).
+2. **Bounded LLM agent loop (less-deterministic).** Same `LLMClient`
+   protocol the AgenticTier uses, but with a **narrower 3-tool surface**
+   surfaced to the model:
+   * `get_node(node_id)`
+   * `get_neighbors(node_id, relation_type=None, depth=1)`
+   * `get_source_record(source_file, record_id)`
+
+   `pattern_query` / `fulltext_search` / `vector_search` are
+   intentionally out of scope: the cluster from step 1 is the recall;
+   the agent's job is to traverse, not to re-search. **Tool budget = 6**
+   — overshoot returns the last partial summary text with
+   `relevance=0.0` and `extras.reason="tool_budget_exceeded"` (no
+   crash). Tool exceptions are forwarded to the model as the next
+   turn's tool result so the model can self-correct (mirrors
+   `AgenticTier`).
+3. **LLM compose (final turn).** When the model emits text instead of
+   another tool call, the loop exits. The text is the structured
+   summary markdown (gist / decisions-and-action-items / open
+   questions / linked entities). Each action item and linked entity
+   carries a `[node:<id>]` citation; the model is instructed to cite
+   only ids surfaced by the cluster or a tool response.
+
+`allowed_tiers = frozenset({"hybrid"})` — `exact` is excluded ("Skip
+T1 entirely — id matches are rare in conversational text") and
+`agentic` is not declared because the workflow drives its own
+LLM loop directly rather than going through the cascade's
+`AgenticTier` (so the loop can expose a custom 3-tool surface
+instead of `AgenticTier`'s standard 6).
+
+Algorithmic relevance (mirrors `AgenticTier.RELEVANCE_*`):
+
+* `0.7` — non-empty summary AND ≥ 1 unique citation harvested.
+* `0.3` — non-empty summary, zero citations.
+* `0.0` — empty thread, tool-budget overshoot, or any LLM exception.
+
+`extras = {kind, tool_calls_used, action_items, linked_entity_ids}`.
+`action_items` is parsed from the `## Decisions / Action items` section
+of the summary (regex over bullet lines); `linked_entity_ids` is the
+order-preserving dedup of `[node:<id>]` markers across the answer.
+
+**Eval harness** (`backend/eval/`):
+
+* `golden.load_golden_set()` extracts `(query, expected_node_ids)`
+  pairs from `dataset/EnterpriseBench/tasks.jsonl`. The first user
+  message is the query; entity ids harvested from subsequent
+  assistant tool-call arguments (`emp_id`, `product_id`, ...) are
+  the expected node ids. Tasks with no extractable id are skipped.
+* `harness.run_eval()` reports recall@5, recall@10, latency p50/p95,
+  per-tier termination counts, and escalation rate. Output is a
+  Markdown table written to `backend/eval/reports/<UTC-timestamp>.md`
+  so successive runs can be diffed.
+
+Run the harness end-to-end:
+
+```
+uv run python -m backend.eval.harness --limit 50
 ```
 
 ### Edit API (human-in-the-loop) -- IMPLEMENTED

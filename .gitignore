@@ -35,3 +35,9 @@ out/
 # skills (regenerable from skills-lock.json via skills-install.sh)
 .agents/
 .claude/
+
+# generated eval reports
+backend/eval/reports/
+
+# Pioneer.ai GLiNER2 fine-tuned weights (downloaded by human, not in git)
+backend/retrieval/router_train/weights/

@@ -7,8 +7,12 @@ aborts the whole run before any writes happen.
 
 LLM blocks (`spec.llm_blocks`) are opt-in. A spec with no blocks does zero
 LLM calls during ingestion. When blocks are declared, `_run_llm_blocks`
-enforces the block's `confidence_floor`, `require_grounding`, and
-`max_extractions_per_record` caps before any node/edge is created.
+enforces the block's `require_grounding` and `max_extractions_per_record`
+caps before any node/edge is created. The LLM's self-rated `confidence`
+field is captured into `Provenance.model_self_score` (audit-only) and is
+never used to filter or threshold facts; whether the surface_form is
+grounded in the source span drives the categorical
+`FactConfidence` (GROUNDED vs INFERRED).
 """
 from __future__ import annotations
 
@@ -22,7 +26,7 @@ from pathlib import Path
 from typing import Any, Iterator
 
 from backend.graph.store import GraphStore, _canonical_json
-from backend.models.graph import GraphEdge, GraphNode, Provenance
+from backend.models.graph import FactConfidence, GraphEdge, GraphNode, Provenance
 
 from . import runtime
 from .llm import GeminiClient, LLMError
@@ -404,14 +408,14 @@ class Ingestor:
             if not isinstance(conf, (int, float)):
                 raise LLMError(
                     f"llm_block {block.name!r}: every item must declare a numeric "
-                    f"`confidence`; got {conf!r}"
+                    f"`confidence`; got {conf!r}. (This number is captured as "
+                    "`model_self_score` for audit only; it never gates the fact.)"
                 )
-            if conf < block.confidence_floor:
+            surface = _grounding_surface(item)
+            grounded = surface is not None and surface.lower() in haystack
+            if block.require_grounding and not grounded:
                 continue
-            if block.require_grounding:
-                surface = _grounding_surface(item)
-                if surface is None or surface.lower() not in haystack:
-                    continue
+            item["_grounded"] = grounded  # consumed by _materialize_llm_items
             kept.append(item)
         return kept
 
@@ -433,7 +437,9 @@ class Ingestor:
         edge_rule = edge_index.get(block.output_edge_rule) if block.output_edge_rule else None
 
         for item in items:
-            confidence = float(item["confidence"])  # validated in _call_llm_block
+            self_score = float(item["confidence"])  # LLM self-rated, audit-only
+            grounded = bool(item.pop("_grounded", False))
+            fact_conf = FactConfidence.GROUNDED if grounded else FactConfidence.INFERRED
             mention_node_id: str | None = None
             if node_rule is not None:
                 mention_node_id = _render_id_template(node_rule, item)
@@ -443,13 +449,13 @@ class Ingestor:
                 for p in prov:
                     p.extraction_method = "llm_extraction"
                     p.extraction_model = block.model
-                    p.confidence = confidence
+                    p.confidence = fact_conf
+                    p.model_self_score = self_score
                 node = GraphNode(
                     id=mention_node_id,
                     type=spec.resolved_node_type(node_rule),
                     attributes=attrs,
                     provenance=prov,
-                    confidence=confidence,
                 )
                 if not dry_run:
                     self._store.add_node(node)
@@ -471,7 +477,7 @@ class Ingestor:
                 relation_type=edge_rule.canonical_type,
                 attributes={
                     k: v for k, v in item.items()
-                    if k in {"surface_form", "context", "confidence"}
+                    if k in {"surface_form", "context"}
                 },
                 provenance=[Provenance(
                     source_file=source_file,
@@ -479,11 +485,11 @@ class Ingestor:
                     source_field=block.input_source,
                     extraction_method="llm_extraction",
                     extraction_model=block.model,
-                    confidence=confidence,
+                    confidence=fact_conf,
                     raw_value=str(item.get("surface_form", ""))[:500],
+                    model_self_score=self_score,
                     spec_version=spec.spec_version,
                 )],
-                confidence=confidence,
                 valid_from=None,
             )
             if not dry_run:
@@ -540,7 +546,7 @@ def _build_attributes(
             source_field=used_path,
             extraction_method="direct_mapping",
             extraction_model=f"spec:v{spec_version}",
-            confidence=1.0,
+            confidence=FactConfidence.EXACT,
             raw_value=str(value),
             spec_version=spec_version,
         ))

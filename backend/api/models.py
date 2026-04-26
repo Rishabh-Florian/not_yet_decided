@@ -5,6 +5,9 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from backend.models.graph import FactConfidence
+from backend.retrieval.models import QueryContext
+
 
 class ProvenanceResponse(BaseModel):
     source_file: str
@@ -12,8 +15,9 @@ class ProvenanceResponse(BaseModel):
     source_field: str
     extraction_method: str
     extraction_model: str
-    confidence: float
+    confidence: FactConfidence
     raw_value: str
+    model_self_score: float | None = None
     extracted_at: datetime | None = None
     spec_version: int | None = None
 
@@ -31,7 +35,6 @@ class NodeResponse(BaseModel):
     type: str
     attributes: dict[str, Any]
     provenance: list[ProvenanceResponse]
-    confidence: float
     vfs_path: str
     created_at: datetime | None = None
     updated_at: datetime | None = None
@@ -45,7 +48,6 @@ class EdgeResponse(BaseModel):
     relation_type: str
     attributes: dict[str, Any]
     provenance: list[ProvenanceResponse]
-    confidence: float
     valid_from: datetime | None = None
     valid_to: datetime | None = None
     version: int
@@ -94,3 +96,10 @@ class PatternQueryResponse(BaseModel):
 class EditNodeRequest(BaseModel):
     attributes: dict[str, Any]
     editor: str
+
+
+class QueryRequest(BaseModel):
+    """Request body for `POST /api/query` — the retrieval cascade entrypoint."""
+
+    query: str
+    context: QueryContext | None = None

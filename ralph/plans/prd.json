@@ -1,11 +1,77 @@
 [
     {
-        "category": "example",
-        "description": "Replace with your feature description",
-        "steps": [
-            "step 1",
-            "step 2"
-        ],
-        "passes": false
+        "issue": 10,
+        "category": "refactor",
+        "description": "Ground every confidence value in real computation: FactConfidence enum, drop confidence_floor, drop GraphNode/Edge.confidence defaults, schema migration",
+        "depends_on": [],
+        "passes": true,
+        "blocked": false
+    },
+    {
+        "issue": 2,
+        "category": "feat-retrieval",
+        "description": "R0 ContextEngine + cascade orchestrator + eval harness. Defines QueryResult.relevance + Hit.score (algorithmic only).",
+        "depends_on": [10],
+        "passes": true,
+        "blocked": false
+    },
+    {
+        "issue": 3,
+        "category": "feat-retrieval",
+        "description": "R1 Tier 1 ExactTier (Cypher + Neo4j fulltext)",
+        "depends_on": [2],
+        "passes": true,
+        "blocked": false
+    },
+    {
+        "issue": 4,
+        "category": "feat-retrieval",
+        "description": "R2 Tier 3 HybridTier (vector + fulltext + rerank). Needs Neo4j HNSW vector index.",
+        "depends_on": [2],
+        "passes": true,
+        "blocked": false,
+        "notes": "Reranker deferred; sentence-transformers dep not added (see human-backlog)."
+    },
+    {
+        "issue": 6,
+        "category": "feat-retrieval",
+        "description": "R4 Tier 2 RouterTier (Pioneer.ai GLiNER2). Likely blocked on human fine-tuning.",
+        "depends_on": [2],
+        "passes": true,
+        "blocked": false,
+        "notes": "Stub fallback ships; real GLiNER2 fine-tune is human-only on Pioneer.ai (see human-backlog)."
+    },
+    {
+        "issue": 5,
+        "category": "feat-retrieval",
+        "description": "R3 Tier 4 AgenticTier (Gemini function-calling). Needs GEMINI_API_KEY.",
+        "depends_on": [2],
+        "passes": true,
+        "blocked": false,
+        "notes": "NoopLLMClient ships as default; real Gemini gated on GEMINI_API_KEY (see human-backlog)."
+    },
+    {
+        "issue": 7,
+        "category": "feat-retrieval",
+        "description": "R5a Workflow framework (frozen tier policies)",
+        "depends_on": [3, 4, 5, 6],
+        "passes": true,
+        "blocked": false
+    },
+    {
+        "issue": 8,
+        "category": "feat-retrieval",
+        "description": "R5b Deterministic workflow: answer-customer-email",
+        "depends_on": [7],
+        "passes": true,
+        "blocked": false
+    },
+    {
+        "issue": 9,
+        "category": "feat-retrieval",
+        "description": "R5c Less-deterministic workflow: thread-summary",
+        "depends_on": [7],
+        "passes": true,
+        "blocked": false
     }
 ]

@@ -1,9 +1,109 @@
 # Progress Log
 
-## Session [DATE]
+## Session 2026-04-26 (manual ralph mode — Claude Code session as orchestrator)
 
 ### Status
-- Branch: [BRANCH]
-- Notes: [what was done, blockers, next steps]
+- Branch: main
+- Order: #10 -> #2 -> #3 -> #4 -> #6 -> #5 -> #7 -> #8 -> #9
+- Mode: subagent per issue, Opus orchestrator verifies
+
+### 2026-04-26 — #10 done (provenance refactor)
+- FactConfidence StrEnum (exact/grounded/inferred/human) replaces float on Provenance.
+- model_self_score: float | None added (audit-only, never used for filtering).
+- GraphNode.confidence + GraphEdge.confidence dropped entirely.
+- LLMExtraction.confidence_floor dropped; require_grounding is the only LLM gate.
+- SQLite migration 001_confidence_enum.py: idempotent table-rebuild; legacy llm_extraction rows mapped to 'grounded' (require_grounding gate already enforced upstream); raw float preserved into model_self_score.
+- Edit API now writes FactConfidence.HUMAN.
+- Verifiers: ruff clean, pyright 0 errors, pytest 22 passed / 8 Neo4j-gated skipped.
+- Deviations: backend/retrieval/models.py rename deferred to retrieval issues; Neo4j Cypher migration to drop stale n.confidence/r.confidence on existing live DB not implemented (only new writes are clean).
+- Next: #2 (R0 ContextEngine).
+
+### 2026-04-26 — #2 done (R0 ContextEngine + cascade + eval harness)
+- backend/retrieval/: ContextEngine, CascadeOrchestrator, Tier ABC, StubTier, Pydantic models (QueryResult.relevance, Hit.score — both algorithm-documented per #10).
+- backend/eval/: golden.py (load_golden_set + key-based id extraction, ~97% coverage on tasks.jsonl), harness.py (run_eval, format_report_markdown, CLI __main__).
+- API: POST /api/query wired with default orchestrator (StubTier only; tier impls follow in #3-#6).
+- Verifiers: ruff clean, pyright 0 errors, pytest 70 passed / 8 Neo4j-skipped.
+- backend/eval/reports/ added to .gitignore (generated artifact dir).
+- Notes: tier registration is explicit list + matching TierConfig list (no name-magic); cascade fallback returns last tier's result not error; timeout_ms passed as hint via QueryContext.max_latency_ms.
+- Next: #3 (R1 ExactTier).
+
+### 2026-04-26 — #3 done (R1 ExactTier)
+- backend/retrieval/exact.py: ExactTier(store, *, name, fulltext_limit). Reuses store._driver.
+- backend/retrieval/index.py: ensure_indexes — CREATE FULLTEXT INDEX node_text IF NOT EXISTS on (n:Entity).attributes_json.
+- Cascade wired: build_orchestrator_with_store(store) -> [ExactTier (escalate_below=0.5), StubTier (terminal)].
+- API lifespan now uses build_orchestrator_with_store; storeless path retained for unit tests.
+- Score docstring: id-match=1.0 ("Cypher exact-id"); fulltext score = Lucene BM25-similar squashed via score/(1+score).
+- Tier triggers: id-token regex (emp_\d+, CLNT/CUST/VEND/ORG-\d+, ASIN, UUIDs, ticket|conv|order|sale|product[-_:]\w+); fulltext only if no id + <=4 tokens + no wildcards.
+- Verifiers: ruff clean, pyright 0 errors, pytest 102 passed / 11 RUN_INTEGRATION-skipped.
+- Open: p95 latency acceptance criterion needs RUN_INTEGRATION=1 with populated graph (eval-harness ready).
+- Next: #4 (R2 HybridTier).
+
+### 2026-04-26 — #4 done (R2 HybridTier)
+- backend/retrieval/hybrid.py: HybridTier(store, embedder, *, candidate_limit=30, result_limit=10, rrf_k=60). Vector arm (Neo4j HNSW on :Entity.embedding) + fulltext arm (existing node_text) fused via RRF (k=60), normalized to [0,1].
+- backend/retrieval/embedder.py: Embedder Protocol (dim, embed). StubEmbedder (hash-based, no semantic signal — for tests). BgeSmallEmbedder (lazy import sentence-transformers, BAAI/bge-small-en-v1.5).
+- backend/retrieval/embed.py: one-shot CLI to populate :Entity.embedding (uv run python -m backend.retrieval.embed).
+- backend/retrieval/index.py: ENTITY_VECTOR_INDEX="entity_vec", ensure_vector_index — idempotent CREATE VECTOR INDEX cosine.
+- Cascade: [exact (escalate<0.5), hybrid (escalate<0.3), stub (terminal)]. QONTEXT_EMBEDDER env: stub|bge.
+- Verifiers: ruff clean, pyright 0 errors, pytest 136 passed / 13 skipped.
+- Deferred (logged in human-backlog.txt): sentence-transformers dep, reranker, embedding population, recall/latency benchmarks.
+- Next: #6 (R4 RouterTier - GLiNER2).
+
+### 2026-04-26 — #6 done (R4 RouterTier - Pioneer.ai GLiNER2)
+- backend/retrieval/router.py: RouterTier(router, exact_tier, *, min_intent_conf=0.5, next_tier_for=...). EntityRouter Protocol + StubEntityRouter (regex) + GLiNER2EntityRouter (lazy gliner; raises if GLINER2_MODEL_PATH/PIONEER_AI_MODEL_ID unset).
+- backend/retrieval/router_train/: prompt.md, seed_examples.jsonl (50), eval_set.jsonl (45), README.md (12-step Pioneer workflow + Pioneer side-challenge submission checklist).
+- scripts/gen_router_seed.py: re-derive seeds from tasks.jsonl.
+- Cascade: [exact, router, hybrid, stub]. Router placed after exact so id-token regex hits never spend 200ms NER budget.
+- New: QueryResult.route_to: str | None — orchestrator honors at most once per query, never revisits a tier (3 new tests).
+- Hit.score for RouterTier: forwarded verbatim from delegated ExactTier on lookup; zero hits + relevance=0.0 on search/analytical/ambiguous (router is a routing decision, not a retriever — documented).
+- analytical → agentic (R3, not yet landed); orchestrator falls through to next-in-order if route_to unknown.
+- gliner package NOT in pyproject (~700MB transitive); StubEntityRouter keeps CI green.
+- Verifiers: ruff clean, pyright 0 errors, pytest 185 passed / 15 skipped.
+- Pioneer.ai fine-tune logged in human-backlog.txt (12 steps, full materials prepared).
+- Next: #5 (R3 AgenticTier - Gemini).
+
+### 2026-04-26 — #5 done (R3 AgenticTier - Gemini function-calling)
+- backend/retrieval/agentic.py: AgenticTier(store, embedder, llm, *, max_iterations=6, wall_clock_budget_ms=10_000). LLMClient ABC + LLMTurn/ToolCall/ToolResult dataclasses. StubLLMClient (scripted, tests), NoopLLMClient (no-key default), GeminiLLMClient (lazy google-genai, raises if GEMINI_API_KEY unset).
+- backend/retrieval/tools.py: ToolBox with 6 tools — pattern_query (typed DSL via parse_pattern, no free Cypher), fulltext_search, vector_search, get_node, get_neighbors, get_source_record. CitationCollector dedups on (source_file, source_record_id, source_field). Per-tool size caps: _MAX_K=25, _MAX_DEPTH=3, _MAX_NEIGHBORS=50.
+- Cascade: [exact, router, hybrid, agentic, stub] — agentic between hybrid and stub; router's route_to="agentic" lands here.
+- Algorithmic relevance (per #10): RELEVANCE_GROUNDED=0.7 (final answer + ≥1 citation), RELEVANCE_UNGROUNDED=0.3 (answer no citations), RELEVANCE_FAILED=0.0 (timeout/overshoot/exception). NOT agent self-rating.
+- Env: QONTEXT_AGENTIC=gemini|noop (default noop).
+- Verifiers: ruff clean, pyright 0 errors, pytest 242 passed / 16 skipped.
+- Human-backlog: GEMINI_API_KEY + QONTEXT_AGENTIC=gemini setup checklist.
+- All 4 tiers + 1 stub now wired. Next: #7 (R5a Workflow framework).
+
+### 2026-04-26 — #7 done (R5a Workflow framework)
+- backend/retrieval/workflows/: base.py (Workflow ABC, WorkflowInput, WorkflowResult, TierRegistry), registry.py (register_workflow decorator, get_workflow, build_workflow).
+- Frozen-policy enforcement (two-layer): (1) Workflow.allowed_tiers: ClassVar[frozenset[str]] at type level; (2) TierRegistry snapshot built from dict[str, Tier] — workflow body has no handle on wider tier set; __init__ asserts tiers.allowed == cls.allowed_tiers.
+- API: POST /api/workflow/{name} (404 unknown, 422 invalid body, 400 ValueError/TypeError, 500 missing tier); GET /api/workflow discovery.
+- backend/retrieval/orchestrator.py + engine.py: tiers_by_name property added.
+- Verifiers: ruff clean, pyright 0 errors, pytest 269 passed / 16 skipped.
+- ARCHITECTURE.md doc deferred to #8 (first concrete workflow lands there).
+- Next: #8 (R5b answer-customer-email workflow).
+
+### 2026-04-26 — #8 done (R5b answer-customer-email — deterministic workflow)
+- backend/retrieval/workflows/customer_email.py: CustomerEmailWorkflow.
+- name: "answer-customer-email"; allowed_tiers: frozenset({"exact","hybrid"}) — agentic excluded.
+- Fixed sequence: (1) exact.search(normalized_email)→sender or relevance=0 unknown_sender; (2) GraphStore.neighbors(sender_id, depth=1, cap=25); (3) hybrid.search(body, top-5 product candidates); (4) LLMClient.start(brief, tools=[]) single-shot compose (no tool loop; tool calls in compose response → RuntimeError).
+- I/O: CustomerEmailInput(from_address, subject, body, thread_history); WorkflowResult.extras={from_address, sender_node_id, related_count, product_candidate_count}.
+- build_workflow extended with **extras to thread llm/store deps without bloating framework.
+- Citations dedup'd on (source_file, source_record_id, source_field).
+- Verifiers: ruff clean, pyright 0 errors, pytest 283 passed / 16 skipped.
+- Backlog: API endpoint extras wiring, SAME_AS-cluster identity, p95 benchmark, URL-slug doc fix.
+- Next: #9 (R5c thread-summary).
+
+### 2026-04-26 — #9 done (R5c thread-summary — less-deterministic workflow)
+- backend/retrieval/workflows/thread_summary.py: ThreadSummaryWorkflow.
+- name: "thread-summary"; allowed_tiers: frozenset({"hybrid"}) — exact excluded (id matches rare in conversational text); agentic NOT declared (workflow runs its own narrower 3-tool dispatcher).
+- Tool surface: get_node, get_neighbors, get_source_record (excludes pattern_query/fulltext_search/vector_search since T3 already did recall).
+- Iteration cap: _MAX_TOOL_CALLS=6. Overshoot → relevance=0.0, extras.reason="tool_budget_exceeded".
+- LLM "less-deterministic" knob: chooses which cluster nodes to expand, which records to pull, when to stop. Tier set + initial recall queries are deterministic; traversal depth/breadth is model-driven within budget.
+- IO: ThreadSummaryInput(kind: meeting|slack|email_thread, participants, messages); WorkflowResult.answer = structured markdown; extras = {kind, tool_calls_used, action_items, linked_entity_ids, [reason]}.
+- Citations dedup'd via single CitationCollector across T3 hits + every tool call.
+- Algorithmic relevance: 0.7 grounded / 0.3 ungrounded / 0.0 failed (mirrors AgenticTier).
+- Light NER via regex (emp|cust|customer|prod|product|ticket|order|sale)_<id>; GLiNER2 swap deferred until #6 fine-tune lands.
+- Verifiers: ruff clean, pyright 0 errors, pytest 301 passed / 16 skipped.
+
+## ALL 9 ISSUES DONE
+Sequence: #10, #2, #3, #4, #6, #5, #7, #8, #9. Branch: feature/ralph-batch.
 
 ---

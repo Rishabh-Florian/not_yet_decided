@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
+from enum import StrEnum
 from typing import Any
 import uuid
 
@@ -12,6 +13,19 @@ def _now() -> datetime:
 
 def _new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:12]}"
+
+
+class FactConfidence(StrEnum):
+    """Categorical fact-trust label. Never a magic float.
+
+    A confidence value is always grounded in a real computation, deterministic
+    rule, or human action. If we don't have an algorithm, we use a category —
+    not a fabricated number. See docs/ARCHITECTURE.md for the principle.
+    """
+    EXACT = "exact"          # direct mapping or deterministic rule
+    GROUNDED = "grounded"    # LLM extraction whose surface_form was found in source
+    INFERRED = "inferred"    # LLM extraction without grounding match
+    HUMAN = "human"          # human edit / override
 
 
 @dataclass
@@ -36,14 +50,19 @@ class Provenance:
     source_field: str
     extraction_method: str          # "direct_mapping" | "llm_extraction" | "rule_based" | "human"
     extraction_model: str           # e.g. "claude-sonnet-4-6" or "rule:email_parser_v1"
-    confidence: float
+    confidence: FactConfidence      # categorical fact-trust label, never a float
     raw_value: str
+    model_self_score: float | None = None   # LLM self-rated number, audit-only; never used for filtering
     extracted_at: datetime | None = field(default_factory=_now)
     spec_version: int | None = None # MappingSpec version that produced this fact
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
         d["extracted_at"] = self.extracted_at.isoformat() if self.extracted_at else None
+        # StrEnum.value for clean JSON output (FactConfidence already serializes
+        # as its string value, but be explicit so downstream consumers don't
+        # depend on str(enum) semantics).
+        d["confidence"] = self.confidence.value
         return d
 
     @classmethod
@@ -51,6 +70,8 @@ class Provenance:
         d = dict(d)
         if isinstance(d.get("extracted_at"), str):
             d["extracted_at"] = datetime.fromisoformat(d["extracted_at"])
+        if "confidence" in d and not isinstance(d["confidence"], FactConfidence):
+            d["confidence"] = FactConfidence(d["confidence"])
         return cls(**d)
 
 
@@ -59,7 +80,6 @@ class GraphNode:
     type: str                                   # "Employee", "Customer", "Product", ...
     attributes: dict[str, Any] = field(default_factory=dict)
     provenance: list[Provenance] = field(default_factory=list)
-    confidence: float = 1.0
     vfs_path: str = ""
     id: str = field(default_factory=lambda: _new_id("node"))
     created_at: datetime | None = field(default_factory=_now)
@@ -78,7 +98,6 @@ class GraphEdge:
     relation_type: str                          # "REPORTS_TO", "PURCHASED", ...
     attributes: dict[str, Any] = field(default_factory=dict)
     provenance: list[Provenance] = field(default_factory=list)
-    confidence: float = 1.0
     valid_from: datetime | None = field(default_factory=_now)
     valid_to: datetime | None = None
     id: str = field(default_factory=lambda: _new_id("edge"))

@@ -19,6 +19,21 @@ from fastapi.middleware.cors import CORSMiddleware
 import backend.config as cfg
 from backend.graph.store import GraphStore, parse_pattern
 from backend.models.graph import GraphEdge, GraphNode, Provenance
+from backend.retrieval import (
+    CascadeOrchestrator,
+    ContextEngine,
+    QueryResult,
+    StubTier,
+    TierConfig,
+    build_orchestrator_with_store,
+)
+from backend.retrieval.workflows import (
+    WorkflowInput,
+    WorkflowResult,
+    build_workflow,
+    list_workflows,
+    register_builtin_workflows,
+)
 
 from .models import (
     EdgeResponse,
@@ -31,6 +46,7 @@ from .models import (
     PatternQueryRequest,
     PatternQueryResponse,
     ProvenanceResponse,
+    QueryRequest,
     SourceRecordResponse,
     StatsResponse,
 )
@@ -46,7 +62,6 @@ def _node(n: GraphNode) -> NodeResponse:
         type=n.type,
         attributes=n.attributes,
         provenance=[_prov(p) for p in n.provenance],
-        confidence=n.confidence,
         vfs_path=n.vfs_path,
         created_at=n.created_at,
         updated_at=n.updated_at,
@@ -62,11 +77,46 @@ def _edge(e: GraphEdge) -> EdgeResponse:
         relation_type=e.relation_type,
         attributes=e.attributes,
         provenance=[_prov(p) for p in e.provenance],
-        confidence=e.confidence,
         valid_from=e.valid_from,
         valid_to=e.valid_to,
         version=e.version,
     )
+
+
+def _build_default_engine() -> ContextEngine:
+    """Stub-only engine for unit tests that bypass the live store.
+
+    Production wiring uses `_build_engine_with_store` from the lifespan,
+    which adds `ExactTier` (R1) as tier 0. This builder remains as a
+    storeless fallback so `/api/query` can be exercised in tests that
+    mock the GraphStore dependency.
+    """
+    tier = StubTier(name="stub")
+    orch = CascadeOrchestrator(
+        tiers=[tier],
+        configs=[TierConfig(name="stub", escalate_below=0.0)],
+    )
+    return ContextEngine(orch)
+
+
+def _build_engine_with_store(store: GraphStore) -> ContextEngine:
+    """Cascade `[ExactTier, HybridTier, StubTier]` — the live `/api/query` engine."""
+    return ContextEngine(build_orchestrator_with_store(store))
+
+
+def _build_llm_from_env() -> object:
+    """Mirror the QONTEXT_AGENTIC selection in build_orchestrator_with_store
+    so workflows that need an LLM (thread-summary, customer-email) get the
+    same backend the cascade uses.
+    """
+    from backend.retrieval.agentic import GeminiLLMClient, NoopLLMClient
+
+    kind = os.environ.get("QONTEXT_AGENTIC", "noop").lower()
+    if kind == "gemini":
+        return GeminiLLMClient()
+    if kind == "noop":
+        return NoopLLMClient(text="workflow LLM not configured (set QONTEXT_AGENTIC=gemini)")
+    raise ValueError(f"QONTEXT_AGENTIC must be 'gemini' or 'noop', got {kind!r}")
 
 
 @asynccontextmanager
@@ -79,7 +129,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         neo4j_password=cfg.NEO4J_PASSWORD,
         neo4j_database=cfg.NEO4J_DATABASE,
     )
+    # Built-in workflows must be registered before any /api/workflow
+    # request lands; explicit call replaces the previous import-side-
+    # effect registration in `workflows/__init__.py`.
+    register_builtin_workflows()
     app.state.store = store
+    app.state.llm = _build_llm_from_env()
+    app.state.context_engine = _build_engine_with_store(store)
     yield
     store.close()
 
@@ -102,6 +158,69 @@ app.add_middleware(
 
 def get_store(request: Request) -> GraphStore:
     return request.app.state.store  # type: ignore[no-any-return]
+
+
+def get_context_engine(request: Request) -> ContextEngine:
+    return request.app.state.context_engine  # type: ignore[no-any-return]
+
+
+def get_llm(request: Request) -> object:
+    return request.app.state.llm  # type: ignore[no-any-return]
+
+
+# ---------- Retrieval API ----------
+
+
+@app.post("/api/query", response_model=QueryResult)
+async def query(
+    body: QueryRequest,
+    engine: ContextEngine = Depends(get_context_engine),
+) -> QueryResult:
+    if not body.query or not body.query.strip():
+        raise HTTPException(400, "query must be a non-empty, non-whitespace string")
+    try:
+        return engine.query(body.query, body.context)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+
+
+# ---------- Workflow API ----------
+
+
+@app.get("/api/workflow")
+async def list_workflows_endpoint() -> dict[str, list[str]]:
+    """Discovery endpoint — names of every registered workflow."""
+    return {"workflows": list_workflows()}
+
+
+@app.post("/api/workflow/{name}", response_model=WorkflowResult)
+async def run_workflow(
+    name: str,
+    body: WorkflowInput,
+    engine: ContextEngine = Depends(get_context_engine),
+    store: GraphStore = Depends(get_store),
+    llm: object = Depends(get_llm),
+) -> WorkflowResult:
+    """Invoke a registered workflow by name.
+
+    * 404 — workflow `name` is not registered.
+    * 422 — `body` is not a valid `WorkflowInput` (handled by FastAPI).
+    * 400 — workflow's `run()` raised on its payload validation
+      (`ValueError` / `TypeError`).
+    * 200 — `WorkflowResult` JSON.
+    """
+    try:
+        wf = build_workflow(name, engine.tiers_by_name, llm=llm, store=store)
+    except KeyError as e:
+        raise HTTPException(404, str(e)) from e
+    except ValueError as e:
+        # Engine missing a tier the workflow requires — a deployment bug,
+        # not a client bug; surface it as 500 so it's noticed.
+        raise HTTPException(500, str(e)) from e
+    try:
+        return wf.run(body)
+    except (ValueError, TypeError) as e:
+        raise HTTPException(400, str(e)) from e
 
 
 # ---------- Graph API ----------

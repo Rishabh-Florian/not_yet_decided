@@ -19,8 +19,33 @@ from __future__ import annotations
 import csv
 import json
 import logging
+import re
 from pathlib import Path
 from typing import Any
+
+# A dot-notation JSONPath segment is "safe" only if it's an ASCII identifier.
+# Anything else (spaces, punctuation, leading digit) MUST be bracket-quoted
+# or jsonpath_ng's parser rejects it at runtime.
+_SAFE_KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+# Match each `.<segment>` where <segment> is a run of chars not containing
+# `.`, `[`, or `]`. This deliberately excludes bracket operators like `[*]`
+# so they pass through untouched.
+_DOT_SEGMENT = re.compile(r"\.([^.\[\]]+)")
+
+
+def _bracketize_jsonpath(path: str) -> str:
+    """Convert dot-notation segments containing non-identifier chars into
+    bracket-quoted form. `$.Marital Status` -> `$['Marital Status']`."""
+    if not isinstance(path, str) or not path.startswith("$"):
+        return path
+
+    def rewrite(m: re.Match[str]) -> str:
+        key = m.group(1)
+        if _SAFE_KEY.match(key):
+            return f".{key}"
+        return "['" + key.replace("'", "\\'") + "']"
+
+    return _DOT_SEGMENT.sub(rewrite, path)
 
 from pydantic import ValidationError
 
@@ -70,14 +95,36 @@ Sample of {sample_count} record(s):
 The source has these distinct field paths across the sample:
 {paths}
 
-Draft a complete MappingSpec for this source. Use the most specific canonical
-types that fit. If the source clearly contains messages (emails, chats, posts)
-extract Person SENT/RECEIVED edges. If it contains employees, extract Person
-nodes plus any visible REPORTS_TO/MEMBER_OF edges. Otherwise pick the closest
-canonical types.
+REFERENCE — a complete, validated, production-grade MappingSpec for a
+DIFFERENT source (an emails feed). Imitate its structure, especially:
+  - NodeRule.name (e.g. "sender") and how edges reference nodes via "@<name>"
+  - the omission of `when:` on edges (it appears only on conditional nodes)
+  - id_template like "person:{{emp_id}}" with curly-brace placeholders that
+    match a FieldMap.attribute defined in the same node
+  - canonical_aliases mapping vendor terms to canonical types
+
+```yaml
+{example_spec}
+```
+
+Now draft a complete MappingSpec for THIS source (described above). Use the
+most specific canonical types that fit. If the source clearly contains
+messages (emails, chats, posts) extract Person SENT/RECEIVED edges. If it
+contains employees, extract Person nodes plus any visible REPORTS_TO/MEMBER_OF
+edges. Otherwise pick the closest canonical types.
 
 Set spec_version = 1. Leave required_paths_hash and type_fingerprint as null
 (the runtime fills those in)."""
+
+
+def _load_example_spec() -> str:
+    """The hand-written emails.yaml is the canonical few-shot reference for
+    structurally-correct MappingSpecs. Loaded once at import; cached."""
+    p = Path(__file__).parent.parent.parent / "ingest_specs" / "enterprisebench" / "emails.yaml"
+    return p.read_text(encoding="utf-8")
+
+
+_EXAMPLE_SPEC = _load_example_spec()
 
 
 class OnboardError(RuntimeError):
@@ -121,6 +168,7 @@ class Onboarder:
             "sample_count": len(sample),
             "sample": json.dumps(sample[:5], indent=2)[:4000],
             "paths": "\n".join(f"  {p}" for p in sorted(paths_seen)),
+            "example_spec": _EXAMPLE_SPEC,
         }
         system = _SYSTEM_INSTRUCTION.format(
             canonical_node_types=sorted(CANONICAL_NODE_TYPES),
@@ -163,6 +211,82 @@ class Onboarder:
         )
         return spec
 
+    @staticmethod
+    def _normalize_llm_output(obj: Any) -> Any:
+        """LLM-output normalization at the boundary, before pydantic validates.
+
+        Four recurring Gemini quirks for the MappingSpec schema:
+
+        1. `when: {{}}`. The response_schema can't express nullable object
+           fields reliably, so the LLM emits an empty dict to mean "no
+           predicate". The validator rejects `{{}}`, so drop it.
+
+        2. `id_required_fields` as bare attribute names ('emp_id') instead of
+           JSONPaths ('$.emp_id'). The runtime appends these verbatim to the
+           required-paths list — bare names never match observed paths so the
+           drift check fires "required paths absent in sample". When a bare
+           name matches a field's `attribute`, replace it with that field's
+           `source` (the canonical JSONPath); otherwise prepend "$.".
+
+        3. `required: true` on every FieldMap. The LLM ignores the prompt's
+           guidance to mark sparse fields optional. Force `required: false`
+           on all fields — record-level "must have" is enforced separately
+           via `id_required_fields` (the ID is the only true must). Without
+           this, the runtime drift check inevitably reports "required paths
+           absent" for any field rare enough to miss its 30-record sample.
+
+        4. JSONPath dot-notation for keys with spaces/punctuation. The data
+           has keys like "Marital Status" and "Performance Rating"; the LLM
+           emits `$.Marital Status` which jsonpath_ng can't parse. Convert
+           non-identifier dot segments to bracket form: `$['Marital Status']`.
+
+        Mutates and returns `obj`.
+        """
+        if not isinstance(obj, dict):
+            return obj
+        for key in ("nodes", "edges"):
+            for rule in obj.get(key, []) or []:
+                if isinstance(rule, dict) and rule.get("when") == {}:
+                    rule.pop("when", None)
+        for rule_key in ("nodes", "edges"):
+            for rule in obj.get(rule_key, []) or []:
+                if not isinstance(rule, dict):
+                    continue
+                for fm in rule.get("fields", []) or []:
+                    if not isinstance(fm, dict):
+                        continue
+                    src = fm.get("source")
+                    if isinstance(src, str):
+                        fm["source"] = _bracketize_jsonpath(src)
+                    elif isinstance(src, list):
+                        fm["source"] = [
+                            _bracketize_jsonpath(s) if isinstance(s, str) else s
+                            for s in src
+                        ]
+                    fm["required"] = False
+        for rule in obj.get("nodes", []) or []:
+            if not isinstance(rule, dict):
+                continue
+            attr_to_source: dict[str, str] = {}
+            for fm in rule.get("fields", []) or []:
+                if not isinstance(fm, dict):
+                    continue
+                src = fm.get("source")
+                attr = fm.get("attribute")
+                if isinstance(attr, str) and isinstance(src, str) and src.startswith("$"):
+                    attr_to_source[attr] = src
+            irf = rule.get("id_required_fields")
+            if isinstance(irf, list) and irf:
+                rule["id_required_fields"] = [
+                    _bracketize_jsonpath(
+                        attr_to_source.get(
+                            v, v if isinstance(v, str) and v.startswith("$") else f"$.{v}"
+                        )
+                    )
+                    for v in irf
+                ]
+        return obj
+
     def _validate_with_repair(
         self,
         parsed: Any,
@@ -170,25 +294,41 @@ class Onboarder:
         prompt_inputs: dict[str, Any],
         schema: dict[str, Any],
         system: str,
+        *,
+        max_repair_rounds: int = 3,
     ) -> MappingSpec:
-        try:
-            return MappingSpec.model_validate(parsed)
-        except ValidationError as e:
-            log.warning("first-pass validation failed; asking LLM to repair: %s", e)
-            repaired_parsed, _ = self._gemini.repair(
-                prompt_template=_DRAFT_PROMPT,
-                prompt_inputs=prompt_inputs,
-                output_schema=schema,
-                previous_output=parsed,
-                validator_error=str(e),
-                system_instruction=system,
-            )
+        """Validate `parsed` against MappingSpec; on failure feed the error
+        back to the LLM and retry up to `max_repair_rounds` times. Each retry
+        sees the latest error message — Gemini Flash typically converges
+        within 2-3 rounds when the problem is a constraint it didn't initially
+        respect.
+        """
+        last_error: ValidationError | None = None
+        current = parsed
+        for attempt in range(max_repair_rounds + 1):
+            current = self._normalize_llm_output(current)
             try:
-                return MappingSpec.model_validate(repaired_parsed)
-            except ValidationError as e2:
-                raise OnboardError(
-                    f"spec validation failed twice. last error: {e2}"
-                ) from e2
+                return MappingSpec.model_validate(current)
+            except ValidationError as e:
+                last_error = e
+                if attempt == max_repair_rounds:
+                    break
+                log.warning(
+                    "validation attempt %d/%d failed; asking LLM to repair: %s",
+                    attempt + 1, max_repair_rounds + 1, e,
+                )
+                current, _ = self._gemini.repair(
+                    prompt_template=_DRAFT_PROMPT,
+                    prompt_inputs=prompt_inputs,
+                    output_schema=schema,
+                    previous_output=current,
+                    validator_error=str(e),
+                    system_instruction=system,
+                )
+        raise OnboardError(
+            f"spec validation failed after {max_repair_rounds + 1} attempts. "
+            f"last error: {last_error}"
+        ) from last_error
 
 
 _FORMAT_BY_SUFFIX = {".json": "json", ".jsonl": "jsonl", ".ndjson": "ndjson", ".csv": "csv"}

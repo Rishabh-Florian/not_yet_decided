@@ -30,7 +30,13 @@ from typing import Any, Iterable, Iterator, LiteralString, cast
 
 from neo4j import Driver, GraphDatabase
 
-from backend.models.graph import GraphEdge, GraphNode, Provenance, SourceRecord
+from backend.models.graph import (
+    FactConfidence,
+    GraphEdge,
+    GraphNode,
+    Provenance,
+    SourceRecord,
+)
 
 
 SCHEMA_PATH = Path(__file__).parent / "schema.sql"
@@ -128,12 +134,19 @@ class GraphStore:
     # ---------- lifecycle ----------
 
     def _init_sqlite(self) -> None:
+        # Run migrations against the legacy DB shape BEFORE applying schema.sql,
+        # because schema.sql is `CREATE TABLE IF NOT EXISTS` and won't re-shape
+        # an existing `provenance` table whose columns have drifted from the
+        # canonical definition.
+        self._run_migrations()
+
         with open(SCHEMA_PATH, "r") as f:
             self._conn.executescript(f.read())
         # Idempotent column additions for older databases. SQLite has no
         # IF NOT EXISTS for ADD COLUMN, so we catch the duplicate-column error.
         for ddl in [
             "ALTER TABLE provenance ADD COLUMN spec_version INTEGER",
+            "ALTER TABLE provenance ADD COLUMN model_self_score REAL",
         ]:
             try:
                 self._conn.execute(ddl)
@@ -141,6 +154,15 @@ class GraphStore:
                 if "duplicate column name" not in str(e).lower():
                     raise
         self._conn.commit()
+
+    def _run_migrations(self) -> None:
+        import importlib
+
+        # Module name has a leading digit, so importlib is required.
+        mig = importlib.import_module(
+            "backend.graph.migrations.001_confidence_enum"
+        )
+        mig.migrate(self._conn)
 
     def _init_neo4j(self) -> None:
         with self._session() as s:
@@ -272,7 +294,6 @@ class GraphStore:
                        ON CREATE SET
                            n.type = $type,
                            n.attributes_json = $attrs,
-                           n.confidence = $conf,
                            n.vfs_path = $vfs,
                            n.created_at = $ca,
                            n.updated_at = $ua,
@@ -280,7 +301,6 @@ class GraphStore:
                            n._was_created = 1
                        ON MATCH SET
                            n.attributes_json = $attrs,
-                           n.confidence = $conf,
                            n.updated_at = $ua,
                            n.version = coalesce(n.version, 0) + 1,
                            n._was_created = 0
@@ -291,7 +311,6 @@ class GraphStore:
                     id=node.id,
                     type=node.type,
                     attrs=json.dumps(node.attributes),
-                    conf=node.confidence,
                     vfs=node.vfs_path,
                     ca=_iso(node.created_at),
                     ua=_iso(node.updated_at),
@@ -409,7 +428,7 @@ class GraphStore:
                 source_field=attr_key,
                 extraction_method="human",
                 extraction_model=f"human:{editor}",
-                confidence=1.0,
+                confidence=FactConfidence.HUMAN,
                 raw_value=str(value),
                 extracted_at=now,
                 spec_version=None,
@@ -545,13 +564,11 @@ class GraphStore:
                         MERGE (a)-[r:{rel_type} {{id: $id}}]->(b)
                         ON CREATE SET
                             r.attributes_json = $attrs,
-                            r.confidence = $conf,
                             r.valid_from = $vf,
                             r.valid_to = $vt,
                             r.version = $v
                         ON MATCH SET
                             r.attributes_json = $attrs,
-                            r.confidence = $conf,
                             r.valid_to = $vt,
                             r.version = coalesce(r.version, 0) + 1
                         RETURN r"""),
@@ -559,7 +576,6 @@ class GraphStore:
                     tgt=edge.target_node_id,
                     id=edge.id,
                     attrs=json.dumps(edge.attributes),
-                    conf=edge.confidence,
                     vf=_iso(edge.valid_from),
                     vt=_iso(edge.valid_to),
                     v=edge.version,
@@ -749,12 +765,17 @@ class GraphStore:
         node_id: str | None = None,
         edge_id: str | None = None,
     ) -> None:
+        if not isinstance(p.confidence, FactConfidence):
+            raise TypeError(
+                f"Provenance.confidence must be FactConfidence, "
+                f"got {type(p.confidence).__name__}: {p.confidence!r}"
+            )
         c.execute(
             """INSERT INTO provenance
                (node_id, edge_id, source_file, source_record_id, source_field,
                 extraction_method, extraction_model, extracted_at, confidence,
-                raw_value, spec_version)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                model_self_score, raw_value, spec_version)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 node_id,
                 edge_id,
@@ -764,7 +785,8 @@ class GraphStore:
                 p.extraction_method,
                 p.extraction_model,
                 _iso(p.extracted_at),
-                p.confidence,
+                p.confidence.value,
+                p.model_self_score,
                 p.raw_value,
                 p.spec_version,
             ),
@@ -804,7 +826,6 @@ class GraphStore:
             type=n["type"],
             attributes=json.loads(n["attributes_json"]),
             provenance=provenance,
-            confidence=n["confidence"],
             vfs_path=n.get("vfs_path", "") or "",
             created_at=_parse_iso(n.get("created_at")),
             updated_at=_parse_iso(n.get("updated_at")),
@@ -827,7 +848,6 @@ class GraphStore:
             relation_type=rel_type,
             attributes=json.loads(r["attributes_json"]),
             provenance=provenance,
-            confidence=r["confidence"],
             valid_from=_parse_iso(r.get("valid_from")),
             valid_to=_parse_iso(r.get("valid_to")),
             version=r["version"],
@@ -852,8 +872,11 @@ class GraphStore:
             source_field=row["source_field"],
             extraction_method=row["extraction_method"],
             extraction_model=row["extraction_model"],
-            confidence=row["confidence"],
+            confidence=FactConfidence(row["confidence"]),
             raw_value=row["raw_value"],
+            model_self_score=(
+                row["model_self_score"] if "model_self_score" in keys else None
+            ),
             extracted_at=_parse_iso(row["extracted_at"]),
             spec_version=row["spec_version"] if "spec_version" in keys else None,
         )
