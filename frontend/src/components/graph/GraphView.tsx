@@ -74,6 +74,26 @@ export default function GraphView() {
   const graphData = useMemo(() => data ?? { nodes: [], links: [] }, [data]);
   const filtered = useFilteredGraph<GNode, GLink>(graphData.nodes, graphData.links);
   const { visibleIds, visibleCount, totalCount } = filtered;
+  const viewMode = useFilterStore((s) => s.viewMode);
+  const subgraph = useFilterStore((s) => s.subgraph);
+  const subgraphActive =
+    (subgraph.departments != null && subgraph.departments.size > 0) ||
+    (subgraph.locations != null && subgraph.locations.size > 0);
+
+  // In isolate/expand modes pass only the visible subset to ForceGraph2D so
+  // the physics layout actually collapses to the subgraph.
+  // In dim mode keep the full graph so non-matched nodes stay in place.
+  const renderData = useMemo(() => {
+    if (!subgraphActive || viewMode === "dim") return graphData;
+    const nodes = graphData.nodes.filter((n) => visibleIds.has(n.id));
+    const visSet = visibleIds;
+    const links = graphData.links.filter((l) => {
+      const a = typeof l.source === "string" ? l.source : (l.source as GNode).id;
+      const b = typeof l.target === "string" ? l.target : (l.target as GNode).id;
+      return visSet.has(a) && visSet.has(b);
+    });
+    return { nodes, links };
+  }, [graphData, visibleIds, subgraphActive, viewMode]);
 
   const maxWeight = useMemo(
     () => graphData.links.reduce((m, l) => Math.max(m, l.weight), 1),
@@ -99,12 +119,12 @@ export default function GraphView() {
     const from = animFromRef.current;
     const current = opacityRef.current;
     let changed = false;
-    for (const n of graphData.nodes) {
+    for (const n of renderData.nodes) {
       if (!current.has(n.id)) {
-        current.set(n.id, visibleIds.has(n.id) ? 1 : DIM_NODE_OPACITY);
+        current.set(n.id, 1);
       }
     }
-    for (const n of graphData.nodes) {
+    for (const n of renderData.nodes) {
       const t = visibleIds.has(n.id) ? 1 : DIM_NODE_OPACITY;
       if (targets.get(n.id) !== t) {
         targets.set(n.id, t);
@@ -132,13 +152,13 @@ export default function GraphView() {
       if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
     };
-  }, [graphData.nodes, visibleIds]);
+  }, [renderData.nodes, visibleIds]);
 
-  // Auto-fit visible bounds when filter narrows below threshold.
+  // Auto-fit when isolate/expand narrows the visible set below threshold.
   useEffect(() => {
     if (visibleCount === 0 || visibleCount > AUTO_FIT_THRESHOLD) return;
     const id = window.setTimeout(() => {
-      graphRef.current?.zoomToFit?.(TRANSITION_MS, 80, (n) => visibleIds.has((n as GNode).id));
+      graphRef.current?.zoomToFit?.(TRANSITION_MS, 80);
     }, TRANSITION_MS + 30);
     return () => window.clearTimeout(id);
   }, [visibleCount, visibleIds]);
@@ -259,9 +279,7 @@ export default function GraphView() {
 
   const personCount = graphData.nodes.filter((n) => n.type === "Person").length;
   const messageCount = graphData.nodes.filter((n) => n.type === "Message").length;
-  const showEmpty = totalCount > 0 && visibleCount === 0;
-
-  return (
+  const showEmpty = totalCount > 0 && visibleCount === 0;  return (
     <div
       className="relative h-full w-full overflow-hidden"
       style={{
@@ -270,7 +288,7 @@ export default function GraphView() {
     >
       <ForceGraph2D
         ref={graphRef as never}
-        graphData={graphData}
+        graphData={renderData}
         backgroundColor="rgba(0,0,0,0)"
         nodeColor={(n) => (n as GNode).color}
         nodeVal={(n) => (n as GNode).val}

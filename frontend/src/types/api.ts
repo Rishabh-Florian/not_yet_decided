@@ -5,9 +5,9 @@ export interface ProvenanceResponse {
   source_file: string;
   source_record_id: string;
   source_field: string;
-  extraction_method: "direct_mapping" | "llm_extraction" | "rule_based" | "human";
+  extraction_method: "direct_mapping" | "llm_extraction" | "rule_based" | "human" | "synthetic" | string;
   extraction_model: string;
-  confidence: number;
+  confidence: number | "exact" | "grounded" | "inferred" | "human" | string;
   raw_value?: string;
   spec_version?: string;
   extracted_at: string;
@@ -87,4 +87,44 @@ export interface SourceRecordResponse {
   raw_record: Record<string, unknown>;
   content_hash: string;
   ingested_at: string;
+}
+
+export interface Candidate {
+  value: unknown;
+  confidence: string;
+  source_file: string;
+  spec_version: number | null;
+}
+
+export interface Conflict {
+  id: number;
+  node_id: string;
+  attribute: string;
+  existing: Candidate;
+  incoming: Candidate;
+  verdict: "LLM_TRIAGE" | "ESCALATE" | string;
+  reason: string;
+  status: "open" | "resolved";
+  detected_at: string;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  chosen_value: unknown | null;
+  resolution_method: "human" | "llm" | null;
+}
+
+export interface ConflictListResponse {
+  conflicts: Conflict[];
+  status: "open" | "resolved";
+  total: number;
+}
+
+export interface OnboardResponse {
+  spec_id: number | null;
+  tenant: string;
+  source_pattern: string;
+  spec_version: number;
+  status: "draft" | "active" | string;
+  yaml_text: string;
+  node_types: string[];
+  edge_types: string[];
 }

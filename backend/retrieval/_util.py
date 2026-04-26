@@ -61,7 +61,7 @@ def _citations_from_provenance(rows: list[Provenance]) -> list[Citation]:
         method = p.extraction_method
         # Pydantic Literal in Citation requires the canonical four values; the
         # store can only emit one of those four (validated at insert time).
-        if method not in ("direct_mapping", "llm_extraction", "rule_based", "human"):
+        if method not in ("direct_mapping", "llm_extraction", "rule_based", "human", "synthetic"):
             raise ValueError(f"unexpected extraction_method {method!r} in provenance")
         cites.append(
             Citation(

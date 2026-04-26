@@ -10,11 +10,15 @@ Docs at:     http://localhost:8000/docs
 from __future__ import annotations
 
 import os
+import tempfile
+import shutil
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import AsyncIterator
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 import backend.config as cfg
 from backend.graph.store import GraphStore, parse_pattern
@@ -493,3 +497,116 @@ async def resolve_conflict(
         raise HTTPException(404, str(e)) from None
     except ValueError as e:
         raise HTTPException(400, str(e)) from None
+
+
+# ---------- Onboarding API ----------
+
+
+class OnboardRequest(BaseModel):
+    tenant: str
+    source_format: str | None = None  # json | csv | jsonl — auto-detected if omitted
+    record_path: str = "$[*]"
+    sample_size: int = 20
+
+
+class OnboardResponse(BaseModel):
+    spec_id: int | None = None
+    tenant: str
+    source_pattern: str
+    spec_version: int
+    status: str  # "draft"
+    yaml_text: str
+    node_types: list[str]
+    edge_types: list[str]
+
+
+class PromoteRequest(BaseModel):
+    editor: str | None = None  # for audit trail only
+
+
+@app.post("/api/onboard", response_model=OnboardResponse)
+async def onboard_source(
+    source_file: UploadFile = File(...),
+    tenant: str = Form("default"),
+    source_format: str | None = Form(None),
+    record_path: str = Form("$[*]"),
+    sample_size: int = Form(20),
+    store: GraphStore = Depends(get_store),
+) -> OnboardResponse:
+    """Accept an uploaded file + metadata, run the LLM onboarder, return the draft spec.
+
+    The file is written to a temp path so Onboarder can stat + sample it normally.
+    The draft is saved to SQLite (status='draft') — call POST /api/onboard/{spec_id}/promote
+    to activate it.
+    """
+    from backend.ingest.llm import GeminiClient
+    from backend.ingest.onboard import Onboarder, OnboardError
+    from backend.ingest.spec import MappingSpec as _MappingSpec
+
+    ingest_store = IngestStore(store._conn)
+    tmp_dir = tempfile.mkdtemp()
+    try:
+        suffix = Path(source_file.filename or "upload.json").suffix
+        tmp_path = Path(tmp_dir) / (source_file.filename or f"upload{suffix}")
+        content = await source_file.read()
+        tmp_path.write_bytes(content)
+
+        gemini = GeminiClient(ingest_store)
+        onboarder = Onboarder(gemini, ingest_store, sample_size=sample_size)
+
+        try:
+            spec = onboarder.draft_spec(
+                tmp_path,
+                tenant=tenant,
+                source_format=source_format,
+                record_path=record_path,
+            )
+        except OnboardError as e:
+            raise HTTPException(422, str(e)) from e
+
+        saved = ingest_store.get_spec(
+            tenant,
+            spec.source.file_pattern,
+            spec.spec_version,
+        )
+        return OnboardResponse(
+            spec_id=saved["rowid"] if saved and "rowid" in saved else None,
+            tenant=spec.tenant,
+            source_pattern=spec.source.file_pattern,
+            spec_version=spec.spec_version,
+            status="draft",
+            yaml_text=spec.to_yaml(),
+            node_types=[spec.resolved_node_type(n) for n in spec.nodes],
+            edge_types=[e.canonical_type for e in spec.edges],
+        )
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+@app.post("/api/onboard/{spec_id}/promote", response_model=OnboardResponse)
+async def promote_spec(
+    spec_id: int,
+    body: PromoteRequest,
+    store: GraphStore = Depends(get_store),
+) -> OnboardResponse:
+    """Promote a draft spec to active so the ingestor will use it."""
+    from backend.ingest.spec import MappingSpec as _MappingSpec
+
+    ingest_store = IngestStore(store._conn)
+    saved = ingest_store.get_spec_by_rowid(spec_id)
+    if saved is None:
+        raise HTTPException(404, f"spec {spec_id} not found")
+    ingest_store.set_spec_status_by_rowid(spec_id, "active")
+    saved = ingest_store.get_spec_by_rowid(spec_id)
+    spec = _MappingSpec.from_yaml(saved["yaml_text"])
+    return OnboardResponse(
+        spec_id=spec_id,
+        tenant=spec.tenant,
+        source_pattern=spec.source.file_pattern,
+        spec_version=spec.spec_version,
+        status="active",
+        yaml_text=saved["yaml_text"],
+        node_types=[spec.resolved_node_type(n) for n in spec.nodes],
+        edge_types=[e.canonical_type for e in spec.edges],
+    )
+

@@ -83,7 +83,7 @@ class IngestStore:
         self, tenant: str, source_pattern: str
     ) -> dict[str, Any] | None:
         row = self._conn.execute(
-            """SELECT * FROM mapping_specs
+            """SELECT rowid, * FROM mapping_specs
                WHERE tenant = ? AND source_pattern = ? AND status = 'active'
                ORDER BY version DESC LIMIT 1""",
             (tenant, source_pattern),
@@ -94,11 +94,25 @@ class IngestStore:
         self, tenant: str, source_pattern: str, version: int
     ) -> dict[str, Any] | None:
         row = self._conn.execute(
-            """SELECT * FROM mapping_specs
+            """SELECT rowid, * FROM mapping_specs
                WHERE tenant = ? AND source_pattern = ? AND version = ?""",
             (tenant, source_pattern, version),
         ).fetchone()
         return _spec_row(row) if row else None
+
+    def get_spec_by_rowid(self, rowid: int) -> dict[str, Any] | None:
+        row = self._conn.execute(
+            "SELECT rowid, * FROM mapping_specs WHERE rowid = ?",
+            (rowid,),
+        ).fetchone()
+        return _spec_row(row) if row else None
+
+    def set_spec_status_by_rowid(self, rowid: int, status: str) -> None:
+        with self._tx() as c:
+            c.execute(
+                "UPDATE mapping_specs SET status = ? WHERE rowid = ?",
+                (status, rowid),
+            )
 
     def find_active_spec_by_pattern(
         self, source_pattern: str
@@ -111,7 +125,7 @@ class IngestStore:
         disambiguate.
         """
         rows = self._conn.execute(
-            """SELECT * FROM mapping_specs
+            """SELECT rowid, * FROM mapping_specs
                WHERE source_pattern = ? AND status = 'active'
                ORDER BY version DESC""",
             (source_pattern,),
@@ -299,7 +313,7 @@ class IngestStore:
 
 
 def _spec_row(row: sqlite3.Row) -> dict[str, Any]:
-    return {
+    d: dict[str, Any] = {
         "tenant": row["tenant"],
         "source_pattern": row["source_pattern"],
         "version": row["version"],
@@ -311,3 +325,8 @@ def _spec_row(row: sqlite3.Row) -> dict[str, Any]:
         "status": row["status"],
         "created_at": row["created_at"],
     }
+    try:
+        d["rowid"] = row["rowid"]
+    except IndexError:
+        pass
+    return d

@@ -236,12 +236,11 @@ def build_orchestrator_with_store(store: object) -> CascadeOrchestrator:
         plus an optional `route_to` directive and the orchestrator
         skips ahead per that directive (or falls through to the next
         tier in cascade order if absent).
-      * `hybrid.escalate_below = 0.3` — RRF scores are normalized so
+      * `hybrid.escalate_below = 0.6` — RRF scores are normalized so
         rank-1-in-both-arms == 1.0; in practice realistic queries score
-        between 0.4 and 0.8 (single-arm hits land at ~0.5 max). 0.3 is
-        a permissive floor that escalates only when both arms missed
-        outright. Tune downward if recall is acceptable but escalation
-        is too aggressive.
+        between 0.4 and 0.8 (single-arm hits land at ~0.5 max). 0.6
+        ensures queries with only weak/keyword matches escalate to the
+        agentic tier for a real synthesized answer.
       * `agentic.escalate_below = 0.5` — AgenticTier's algorithmic
         relevance is one of {0.0, 0.3, 0.7} (failed / ungrounded /
         grounded). 0.5 terminates on grounded answers and escalates
@@ -347,7 +346,7 @@ def build_orchestrator_with_store(store: object) -> CascadeOrchestrator:
         configs=[
             TierConfig(name="exact", escalate_below=0.5),
             TierConfig(name="router", escalate_below=0.5),
-            TierConfig(name="hybrid", escalate_below=0.3),
+            TierConfig(name="hybrid", escalate_below=0.6),
             TierConfig(name="agentic", escalate_below=0.5),
             TierConfig(name="stub", escalate_below=0.0),
         ],

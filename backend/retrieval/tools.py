@@ -126,7 +126,7 @@ class CitationCollector:
             if key in self._seen:
                 continue
             method = p.extraction_method
-            if method not in ("direct_mapping", "llm_extraction", "rule_based", "human"):
+            if method not in ("direct_mapping", "llm_extraction", "rule_based", "human", "synthetic"):
                 raise ValueError(
                     f"unexpected extraction_method {method!r} in provenance"
                 )

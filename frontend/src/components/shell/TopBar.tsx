@@ -5,9 +5,11 @@ import { usePathname } from "next/navigation";
 import { GitGraph } from "lucide-react";
 
 const NAV = [
-  { label: "Graph",  href: "/app/graph" },
-  { label: "Nodes",  href: "/app/nodes?type=Person" },
-  { label: "Query",  href: "/app/query" },
+  { label: "Graph",     href: "/app/graph" },
+  { label: "Nodes",     href: "/app/nodes?type=Person" },
+  { label: "Query",     href: "/app/query" },
+  { label: "Conflicts", href: "/app/conflicts" },
+  { label: "Onboard",   href: "/app/onboard" },
 ];
 
 export default function TopBar() {

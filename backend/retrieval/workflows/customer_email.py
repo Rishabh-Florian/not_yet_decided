@@ -297,6 +297,7 @@ class CustomerEmailWorkflow(Workflow):
                     "llm_extraction",
                     "rule_based",
                     "human",
+                    "synthetic",
                 ):
                     raise ValueError(
                         f"unexpected extraction_method {method!r} in provenance"

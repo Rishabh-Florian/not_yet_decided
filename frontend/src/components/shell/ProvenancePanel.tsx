@@ -49,7 +49,7 @@ function SampleProvenance() {
 }
 
 export default function ProvenancePanel() {
-  const { selectedNodeId } = useAppStore();
+  const { selectedNodeId, provenanceFocusField } = useAppStore();
   const { data: node, isLoading } = useNodeDetail(selectedNodeId);
 
   if (!selectedNodeId) {
@@ -68,13 +68,20 @@ export default function ProvenancePanel() {
 
   if (!node) return null;
 
+  const filteredProvenance = provenanceFocusField
+    ? node.provenance.filter(p => p.source_field?.includes(provenanceFocusField))
+    : node.provenance;
+
   return (
     <div className="flex flex-col h-full bg-bg overflow-y-auto">
       <div className="px-4 py-3 border-b border-border-color">
         <p className="text-xs font-medium text-text-tertiary uppercase tracking-widest">Provenance</p>
         <p className="text-xs font-mono text-text-mono mt-1 truncate">{node.id}</p>
+        {provenanceFocusField && (
+          <p className="text-xs font-mono text-accent mt-0.5 truncate">· {provenanceFocusField}</p>
+        )}
       </div>
-      <ProvenanceTimeline provenance={node.provenance} />
+      <ProvenanceTimeline provenance={filteredProvenance} />
     </div>
   );
 }

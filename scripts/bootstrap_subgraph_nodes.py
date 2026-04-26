@@ -100,16 +100,21 @@ def main() -> None:
             continue
         emp_id = p.attributes.get("emp_id") or p.id.replace("person:", "")
         loc = _location_for_emp(emp_id)
+        src_rec_id = f"loc:{p.id}"
         store.add_source_record(
             source_file=SOURCE_FILE,
-            source_record_id=f"loc:{p.id}",
+            source_record_id=src_rec_id,
             raw_record={"node_id": p.id, "office_location": loc},
         )
-        store.edit_node(
-            p.id,
-            {"office_location": loc},
-            editor="bootstrap:v1",
-        )
+        updated_attrs = dict(p.attributes)
+        updated_attrs["office_location"] = loc
+        store.add_node(GraphNode(
+            id=p.id,
+            type=p.type,
+            attributes=updated_attrs,
+            provenance=[_prov(src_rec_id, "office_location", loc)],
+            version=p.version + 1,
+        ))
         injected += 1
     print(f"  {injected} persons updated")
 

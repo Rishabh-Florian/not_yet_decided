@@ -167,27 +167,14 @@ export function useFilteredGraph<N extends FilterableNode, L extends FilterableL
 
     if (viewMode === "isolate") {
       seedIds.forEach((id) => ids.add(id));
-      // Include Organization nodes linked to at least one seed Person.
+      // Add Org nodes connected to any seed via any edge.
+      const nodeById = new Map<string, N>();
+      for (const n of nodes) nodeById.set(n.id, n);
       for (const l of links) {
         const a = endpointId(l.source);
         const b = endpointId(l.target);
-        if (seedIds.has(a) && seedIds.has(b)) {
-          ids.add(a);
-          ids.add(b);
-        }
-      }
-      // Also add Org nodes that have a MEMBER_OF edge to any seed.
-      for (const l of links) {
-        const a = endpointId(l.source);
-        const b = endpointId(l.target);
-        if (seedIds.has(a)) {
-          const bNode = nodes.find((n) => n.id === b);
-          if (bNode?.type === "Organization") ids.add(b);
-        }
-        if (seedIds.has(b)) {
-          const aNode = nodes.find((n) => n.id === a);
-          if (aNode?.type === "Organization") ids.add(a);
-        }
+        if (seedIds.has(a) && nodeById.get(b)?.type === "Organization") ids.add(b);
+        if (seedIds.has(b) && nodeById.get(a)?.type === "Organization") ids.add(a);
       }
     } else if (viewMode === "expand") {
       // Seed nodes + their direct neighbors.

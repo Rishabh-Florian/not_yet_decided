@@ -34,7 +34,7 @@ class Citation(BaseModel):
     source_field: str
     raw_value: str
     extraction_method: Literal[
-        "direct_mapping", "llm_extraction", "rule_based", "human"
+        "direct_mapping", "llm_extraction", "rule_based", "human", "synthetic"
     ]
 
 
