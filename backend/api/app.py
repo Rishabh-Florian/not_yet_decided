@@ -18,6 +18,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 import backend.config as cfg
 from backend.graph.store import GraphStore, parse_pattern
+from backend.ingest import Ingestor, IngestStore, MappingSpec
+from backend.ingest.ingestor import RecordError
 from backend.models.graph import GraphEdge, GraphNode, Provenance
 from backend.retrieval import (
     CascadeOrchestrator,
@@ -54,6 +56,7 @@ from .models import (
     ProvenanceResponse,
     QueryRequest,
     SourceRecordResponse,
+    SourceUpdateResponse,
     StatsResponse,
 )
 
@@ -139,7 +142,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # request lands; explicit call replaces the previous import-side-
     # effect registration in `workflows/__init__.py`.
     register_builtin_workflows()
+    # The push-mode source-update endpoint reuses the existing Ingestor;
+    # `llm_client=None` is safe because `apply_record` only invokes LLM
+    # blocks when the spec declares them, and our active specs don't.
+    ingest_store = IngestStore(store._conn)
+    ingestor = Ingestor(store, ingest_store, llm_client=None)
     app.state.store = store
+    app.state.ingest_store = ingest_store
+    app.state.ingestor = ingestor
     app.state.llm = _build_llm_from_env()
     app.state.context_engine = _build_engine_with_store(store)
     yield
@@ -172,6 +182,14 @@ def get_context_engine(request: Request) -> ContextEngine:
 
 def get_llm(request: Request) -> object:
     return request.app.state.llm  # type: ignore[no-any-return]
+
+
+def get_ingestor(request: Request) -> Ingestor:
+    return request.app.state.ingestor  # type: ignore[no-any-return]
+
+
+def get_ingest_store(request: Request) -> IngestStore:
+    return request.app.state.ingest_store  # type: ignore[no-any-return]
 
 
 # ---------- Retrieval API ----------
@@ -371,6 +389,64 @@ async def get_source_record(
         raw_record=rec.raw_record,
         content_hash=rec.content_hash,
         ingested_at=rec.ingested_at,
+    )
+
+
+@app.post("/api/source/{source_file:path}/{record_id}", response_model=SourceUpdateResponse)
+async def push_source_update(
+    source_file: str,
+    record_id: str,
+    raw_record: dict,
+    store: GraphStore = Depends(get_store),
+    ingestor: Ingestor = Depends(get_ingestor),
+    ingest_store: IngestStore = Depends(get_ingest_store),
+) -> SourceUpdateResponse:
+    """Push-mode source update: apply a corrected/new raw record from a
+    known source-of-truth and re-fire the active spec for just that record.
+
+    The request body is the new raw JSON record (vendor-shape). The active
+    `MappingSpec` for `source_file` is looked up; the spec's `id_template`
+    must render to `record_id` (URL path) — mismatches are 400.
+
+    Conflict detection at `add_node` runs as usual; the response surfaces
+    every conflict CURRENTLY OPEN on the touched nodes (not just the ones
+    that just opened) so callers can see at a glance whether their update
+    landed on a node with unresolved disagreement.
+
+    Idempotent on `(spec_version, source_file, record_id, content_hash)`:
+    replaying the same body returns `{skipped: true, content_changed: false}`
+    without touching the graph.
+    """
+    try:
+        spec_row = ingest_store.find_active_spec_by_pattern(source_file)
+    except ValueError as e:
+        raise HTTPException(409, str(e)) from None
+    if spec_row is None:
+        raise HTTPException(
+            404,
+            f"no active spec for source_file={source_file!r}; "
+            f"onboard + promote it first via `python -m backend.ingest`",
+        )
+
+    spec = MappingSpec.from_yaml(spec_row["yaml_text"])
+
+    try:
+        report = ingestor.apply_record(spec, raw_record, expected_record_id=record_id)
+    except RecordError as e:
+        raise HTTPException(400, str(e)) from None
+
+    open_conflicts = []
+    for node_id in report.nodes_touched:
+        open_conflicts.extend(store.conflicts.list(node_id=node_id, status="open"))
+
+    return SourceUpdateResponse(
+        source_file=source_file,
+        source_record_id=report.source_record_id,
+        spec_version=spec.spec_version,
+        content_changed=report.content_changed,
+        skipped=report.skipped,
+        nodes_touched=report.nodes_touched,
+        conflicts_open=open_conflicts,
     )
 
 

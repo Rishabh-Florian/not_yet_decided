@@ -215,3 +215,38 @@ class TestAddNodeConflicts:
             store._session().run("MATCH (n:Entity {id: $id}) DETACH DELETE n", id=nid).consume()
         finally:
             store.close()
+
+    def test_same_source_self_update_overwrites_without_conflict(self, tmp_path: Path) -> None:
+        """A source-of-truth correcting its own previously-ingested record is
+        not a conflict — the new value replaces the old, no row queued.
+        Foundational for the push-mode `POST /api/source/{file}/{id}` flow.
+        """
+        store = _make_store(tmp_path)
+        try:
+            nid = _unique_id()
+            _seed_record(store, "hr.json", "h1")
+
+            store.add_node(GraphNode(
+                id=nid, type="Person",
+                attributes={"title": "Senior Engineer"},
+                provenance=[_prov("title", FactConfidence.EXACT, "hr.json", "h1",
+                                  "Senior Engineer")],
+            ))
+            # Same (source_file, source_record_id) re-ingests with a corrected value.
+            store.add_node(GraphNode(
+                id=nid, type="Person",
+                attributes={"title": "Staff Engineer"},
+                provenance=[_prov("title", FactConfidence.EXACT, "hr.json", "h1",
+                                  "Staff Engineer")],
+            ))
+
+            n = store.get_node(nid)
+            assert n is not None
+            assert n.attributes["title"] == "Staff Engineer"  # incoming wins
+            assert list(store.conflicts.list(node_id=nid)) == [], (
+                "self-update from same source must NOT queue a conflict"
+            )
+
+            store._session().run("MATCH (n:Entity {id: $id}) DETACH DELETE n", id=nid).consume()
+        finally:
+            store.close()

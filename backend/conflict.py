@@ -20,18 +20,27 @@ Public surface (kept small on purpose):
 
 The decision table, in order (first match wins):
 
-  1. equal after normalize (`strip + casefold`)            → AUTO_MERGE
-  2. either side is `FactConfidence.HUMAN`                 → AUTO_PICK (HUMAN side wins)
-  3. different rungs of the confidence ladder              → AUTO_PICK (higher rung wins)
-  4. both `FactConfidence.INFERRED`                        → LLM_TRIAGE
-  5. otherwise (same rung at EXACT/GROUNDED/HUMAN/HUMAN)   → ESCALATE
+  1. equal after normalize (`strip + casefold`)              → AUTO_MERGE
+  2. same `(source_file, source_record_id)` on both sides    → AUTO_PICK (incoming wins)
+  3. either side is `FactConfidence.HUMAN`                   → AUTO_PICK (HUMAN side wins)
+  4. different rungs of the confidence ladder                → AUTO_PICK (higher rung wins)
+  5. both `FactConfidence.INFERRED`                          → LLM_TRIAGE
+  6. otherwise (same rung at EXACT/GROUNDED/HUMAN/HUMAN)     → ESCALATE
 
-Why these specific lanes: HUMAN is sacred (humans can override anything,
-and a human-vs-human disagreement honestly needs another human).
-EXACT-vs-EXACT conflicts mean two structured fields literally disagree
-— a model cannot break that tie truthfully, so escalate. Free-text
-INFERRED-vs-INFERRED conflicts (e.g. "Acme Corp" vs "Acme Inc.") are
-where an LLM can plausibly resolve, so they get the LLM_TRIAGE lane.
+Why these specific lanes:
+
+  * Rule 2 is what makes the push-mode source-update endpoint work: a
+    record re-ingested from the same source-of-truth is not a conflict,
+    it's an authoritative correction from the system that owns that fact.
+    HUMAN-vs-HUMAN from the same `human_edits` record is also a self-update
+    (a fresh resolution overwriting a stale one), so this rule sits above
+    the HUMAN-overrides rule.
+  * HUMAN is sacred — humans can override any machine-derived fact, and a
+    HUMAN-vs-HUMAN conflict from DIFFERENT edit sessions needs another human.
+  * EXACT-vs-EXACT across DIFFERENT sources literally means two structured
+    fields disagree — a model cannot break that tie truthfully, so escalate.
+  * Free-text INFERRED-vs-INFERRED conflicts ("Acme Corp" vs "Acme Inc.")
+    are where an LLM can plausibly resolve; they get the LLM_TRIAGE lane.
 """
 from __future__ import annotations
 
@@ -129,6 +138,16 @@ def decide(existing: Candidate, incoming: Candidate) -> Decision:
             winner="existing",
             reason="equal_after_normalize",
         )
+
+    # The source-of-truth is correcting itself — the push-mode update flow
+    # depends on this rule. Sits above the HUMAN-overrides + ladder rules
+    # because a self-update is not a cross-source conflict. Excludes the
+    # `<unattributed>` sentinel so two legacy provenance-less candidates
+    # don't accidentally self-merge.
+    if (existing.source_file == incoming.source_file
+            and existing.source_record_id == incoming.source_record_id
+            and existing.source_file != _UNATTRIBUTED_SENTINEL):
+        return Decision(verdict=Verdict.AUTO_PICK, winner="incoming", reason="same_source_updated")
 
     existing_human = existing.confidence == FactConfidence.HUMAN
     incoming_human = incoming.confidence == FactConfidence.HUMAN
@@ -406,6 +425,12 @@ class ConflictStore:
 # silently auto-picked. Conservative, honest, unsurprising.
 _DEFAULT_CONFIDENCE_FOR_LEGACY: FactConfidence = FactConfidence.EXACT
 
+# Sentinel `Candidate.source_file` for legacy provenance with no `attribute`
+# match. The `same_source_updated` rule deliberately ignores this sentinel —
+# two unattributed candidates are NOT a self-update, just two facts whose
+# source identity we couldn't recover.
+_UNATTRIBUTED_SENTINEL: str = "<unattributed>"
+
 
 def _confidence_for(provenance: list[Provenance], attribute: str) -> FactConfidence:
     """Find the most-recent provenance row covering `attribute` and return
@@ -444,8 +469,8 @@ def _candidate_for(
     return Candidate(
         value=value,
         confidence=_DEFAULT_CONFIDENCE_FOR_LEGACY,
-        source_file="<unattributed>",
-        source_record_id="<unattributed>",
+        source_file=_UNATTRIBUTED_SENTINEL,
+        source_record_id=_UNATTRIBUTED_SENTINEL,
     )
 
 

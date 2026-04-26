@@ -63,9 +63,23 @@ def store() -> ConflictStore:
     return ConflictStore(_new_conn())
 
 
+# Counter so each `_cand()` call without explicit src/rid produces a unique
+# (source_file, source_record_id) — by default we want every Candidate to
+# look like it came from a different source, which is the common test
+# scenario (cross-source conflict). Tests that need same-source semantics
+# (TestDecideSameSourceUpdated, reconcile auto_merge cases) pass src+rid
+# explicitly.
+_cand_counter = [0]
+
+
 def _cand(value: object, conf: FactConfidence = EXACT,
-          src: str = "src.json", rid: str = "rec_1") -> Candidate:
-    return Candidate(value=value, confidence=conf, source_file=src, source_record_id=rid)
+          src: str | None = None, rid: str | None = None) -> Candidate:
+    _cand_counter[0] += 1
+    return Candidate(
+        value=value, confidence=conf,
+        source_file=src if src is not None else f"src_{_cand_counter[0]}.json",
+        source_record_id=rid if rid is not None else f"rec_{_cand_counter[0]}",
+    )
 
 
 def _prov(attribute: str, conf: FactConfidence,
@@ -144,6 +158,65 @@ class TestDecideHumanOverrides:
         assert d.verdict == Verdict.AUTO_PICK
         assert d.winner == "existing"
         assert d.reason == "human_overrides"
+
+
+class TestDecideSameSourceUpdated:
+    """A source updating its own previously-ingested record must not escalate.
+
+    Without this rule, every push-mode `POST /api/source/.../{id}` re-ingest
+    where any attribute value changed would queue an ESCALATE conflict
+    against itself — breaking the "edit source → graph reflects it" loop.
+    """
+
+    def test_same_source_record_self_update_picks_incoming(self) -> None:
+        # Same (source_file, source_record_id), different value → incoming wins.
+        d = decide(
+            _cand("Senior Engineer", EXACT, "hr.json", "h1"),
+            _cand("Lead Engineer",   EXACT, "hr.json", "h1"),
+        )
+        assert d.verdict == Verdict.AUTO_PICK
+        assert d.winner == "incoming"
+        assert d.reason == "same_source_updated"
+
+    def test_different_record_in_same_file_does_not_self_update(self) -> None:
+        # Same file, different record_id — a different record. NOT a self-update.
+        # Falls through to the ladder (both EXACT → ESCALATE).
+        d = decide(
+            _cand("Senior Engineer", EXACT, "hr.json", "h1"),
+            _cand("Lead Engineer",   EXACT, "hr.json", "h2"),
+        )
+        assert d.verdict == Verdict.ESCALATE
+
+    def test_different_file_same_record_id_does_not_self_update(self) -> None:
+        # Coincidental record_id collision across files. NOT a self-update.
+        d = decide(
+            _cand("A", EXACT, "hr.json",  "shared_id"),
+            _cand("B", EXACT, "crm.json", "shared_id"),
+        )
+        assert d.verdict == Verdict.ESCALATE
+
+    def test_self_update_with_equal_values_still_auto_merges(self) -> None:
+        # equal_after_normalize fires before same_source_updated (cheap
+        # short-circuit; result is the same — incoming written, prov appended).
+        d = decide(
+            _cand("Alice", EXACT, "hr.json", "h1"),
+            _cand("ALICE", EXACT, "hr.json", "h1"),
+        )
+        assert d.verdict == Verdict.AUTO_MERGE
+
+    def test_self_update_overrides_human_override_rule(self) -> None:
+        # If existing prov is HUMAN from human_edits and incoming is from
+        # the same human_edits source_record_id (a re-resolution edit on
+        # the same conflict), incoming wins via same_source rather than
+        # the human_overrides rule. This is the correct behavior — a fresh
+        # human edit overwrites a stale one from the same edit session.
+        d = decide(
+            _cand("old", HUMAN, "human_edits", "edit:foo"),
+            _cand("new", HUMAN, "human_edits", "edit:foo"),
+        )
+        assert d.verdict == Verdict.AUTO_PICK
+        assert d.winner == "incoming"
+        assert d.reason == "same_source_updated"
 
 
 class TestDecideConfidenceLadder:
@@ -668,7 +741,8 @@ class TestApiList:
     def test_seeded_conflict(self, client: TestClient, fake_store: MagicMock) -> None:
         cid = fake_store.conflicts.record(
             node_id="person:1", attribute="title",
-            existing=_cand("Senior Engineer"), incoming=_cand("Lead Engineer"),
+            existing=_cand("Senior Engineer", src="hr.json", rid="hr:1"),
+            incoming=_cand("Lead Engineer", src="crm.json", rid="crm:1"),
             verdict=Verdict.ESCALATE, reason="tied_at_confident_rung",
         )
         body = client.get("/api/conflicts").json()
@@ -681,14 +755,14 @@ class TestApiList:
             "existing": {
                 "value": "Senior Engineer",
                 "confidence": "exact",
-                "source_file": "src.json",
-                "source_record_id": "rec_1",
+                "source_file": "hr.json",
+                "source_record_id": "hr:1",
             },
             "incoming": {
                 "value": "Lead Engineer",
                 "confidence": "exact",
-                "source_file": "src.json",
-                "source_record_id": "rec_1",
+                "source_file": "crm.json",
+                "source_record_id": "crm:1",
             },
             "verdict": "escalate",
             "reason": "tied_at_confident_rung",

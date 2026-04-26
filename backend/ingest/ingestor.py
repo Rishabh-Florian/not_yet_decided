@@ -57,6 +57,24 @@ class IngestReport:
     drift_diffs: list[str] = field(default_factory=list)
 
 
+@dataclass
+class ApplyRecordReport:
+    """Outcome of `Ingestor.apply_record` — single-record analog of IngestReport.
+
+    Used by the push-mode source-update endpoint
+    (`POST /api/source/{source_file}/{record_id}`) to surface what changed.
+    Conflicts that surfaced are NOT in this report; the caller queries
+    `GraphStore.conflicts.list(node_id=...)` against `nodes_touched` to
+    discover them — keeps responsibilities clean (the ingestor doesn't
+    know about the conflict store).
+    """
+
+    source_record_id: str
+    content_changed: bool
+    nodes_touched: list[str]
+    skipped: bool = False
+
+
 _TEMPLATE_VAR = re.compile(r"\{([^{}]+)\}")
 _DRIFT_SAMPLE_SIZE = 30
 
@@ -129,6 +147,84 @@ class Ingestor:
                     error=error,
                 )
         return report
+
+    def apply_record(
+        self,
+        spec: MappingSpec,
+        record: Any,
+        *,
+        expected_record_id: str | None = None,
+    ) -> ApplyRecordReport:
+        """Apply a single record through the spec — single-record analog of `run`.
+
+        Used by the push-mode source-update endpoint. No `ingest_runs` row,
+        no batch report. Idempotent on `(spec_version, source_file,
+        source_record_id, content_hash)`: if the same content is replayed,
+        returns `skipped=True` without touching the graph.
+
+        Conflict detection in `add_node` fires as usual; conflicts that
+        surface are queryable via `store.conflicts.list(node_id=...)` against
+        `nodes_touched` — this method does not return them directly.
+
+        Args:
+            spec: the active `MappingSpec` for the source.
+            record: the new raw JSON record (not a path; record-shape).
+            expected_record_id: if set, asserts the rendered ID matches.
+                The HTTP route gets `record_id` from the URL path; passing
+                it here ensures the URL and the spec agree before any write.
+
+        Raises:
+            RecordError: missing required field, id_template fails to render,
+                or `expected_record_id` mismatch. Fail-fast — no dead-letter.
+        """
+        source_file = spec.source.file_pattern
+        source_record_id = self._render_primary_id(spec, record)
+        if expected_record_id is not None and expected_record_id != source_record_id:
+            raise RecordError(
+                f"record id mismatch: expected {expected_record_id!r}, "
+                f"spec id_template renders {source_record_id!r}"
+            )
+
+        content_hash = hashlib.sha256(_canonical_json(record).encode("utf-8")).hexdigest()
+        if self._ingest.already_seen(
+            spec_version=spec.spec_version,
+            source_file=source_file,
+            source_record_id=source_record_id,
+            content_hash=content_hash,
+        ):
+            return ApplyRecordReport(
+                source_record_id=source_record_id,
+                content_changed=False,
+                nodes_touched=[],
+                skipped=True,
+            )
+
+        self._store.add_source_record(
+            source_file=source_file,
+            source_record_id=source_record_id,
+            raw_record=record,
+        )
+        applied_nodes = self._apply_node_rules(
+            spec, record, source_file, source_record_id, dry_run=False,
+        )
+        self._apply_edge_rules(
+            spec, record, source_file, source_record_id, applied_nodes, dry_run=False,
+        )
+        self._run_llm_blocks(
+            spec, record, source_file, source_record_id, applied_nodes, dry_run=False,
+        )
+        # Deliberately no `mark_seen` call: there's no run_id and the next
+        # batch `run()` over the same file (unchanged on disk) is naturally
+        # skipped by its own already_seen check against the file's content
+        # hash. If the source file IS later updated, the batch run will see
+        # a NEW hash and re-process — same_source_updated rule keeps that
+        # path consistent with this push.
+        return ApplyRecordReport(
+            source_record_id=source_record_id,
+            content_changed=True,
+            nodes_touched=list(applied_nodes.values()),
+            skipped=False,
+        )
 
     # ---------- record iteration ----------
 

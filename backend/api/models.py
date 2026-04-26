@@ -89,3 +89,29 @@ class QueryRequest(BaseModel):
 
     query: str
     context: QueryContext | None = None
+
+
+class SourceUpdateResponse(BaseModel):
+    """Outcome of `POST /api/source/{source_file}/{record_id}`.
+
+    Wraps the ingest-side report with the conflicts currently open on the
+    touched nodes — a caller can see at a glance whether their update
+    silently overwrote, escalated, or merged.
+    """
+
+    source_file: str
+    source_record_id: str
+    spec_version: int                  # which active MappingSpec version was applied
+    content_changed: bool              # False if the new content_hash matches a prior ingest
+    skipped: bool                      # idempotent skip due to content_hash already_seen
+    nodes_touched: list[str]           # node IDs created or updated
+    conflicts_open: list[Conflict]     # conflicts CURRENTLY OPEN on touched nodes
+
+
+# Conflict is the persisted fact-conflict pydantic model from the conflict
+# bounded context. Imported here only because `SourceUpdateResponse` wraps
+# a list of them; backend.conflict does not import from backend.api.*, so
+# this is a one-way leaf dependency.
+from backend.conflict import Conflict  # noqa: E402
+
+SourceUpdateResponse.model_rebuild()

@@ -100,6 +100,35 @@ class IngestStore:
         ).fetchone()
         return _spec_row(row) if row else None
 
+    def find_active_spec_by_pattern(
+        self, source_pattern: str
+    ) -> dict[str, Any] | None:
+        """Find the unique active spec for a source pattern across all tenants.
+
+        Used by the push-mode source-update endpoint, which gets only the
+        source_file from the URL (no tenant). Raises `ValueError` if more
+        than one tenant has an active spec for the pattern — caller must
+        disambiguate.
+        """
+        rows = self._conn.execute(
+            """SELECT * FROM mapping_specs
+               WHERE source_pattern = ? AND status = 'active'
+               ORDER BY version DESC""",
+            (source_pattern,),
+        ).fetchall()
+        if not rows:
+            return None
+        # Take the highest version per tenant, then check uniqueness across tenants.
+        by_tenant: dict[str, sqlite3.Row] = {}
+        for r in rows:
+            by_tenant.setdefault(r["tenant"], r)  # first row per tenant (highest version due to ORDER BY)
+        if len(by_tenant) > 1:
+            raise ValueError(
+                f"multiple tenants have an active spec for {source_pattern!r}: "
+                f"{sorted(by_tenant.keys())}"
+            )
+        return _spec_row(next(iter(by_tenant.values())))
+
     # ---------- llm_cache ----------
 
     def llm_cache_get(self, cache_key_hash: str) -> dict[str, Any] | None:
