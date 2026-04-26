@@ -113,8 +113,10 @@ uv run pyright         # types
 
 Always go through `uv run` — never invoke `python` / `pip` / `pytest` directly.
 
-Add `GEMINI_API_KEY=...` to a `.env` at the repo root for the
-LLM-driven onboarding (M2). Neo4j connection comes from env vars (defaults
+Add `GEMINI_API_KEY=...` to a `.env` at the repo root. It powers the
+LLM-driven onboarding (M2), the AgenticTier (set `QONTEXT_AGENTIC=gemini`
+to enable), and any workflow that needs an LLM (`thread-summary`,
+`answer-customer-email`). Neo4j connection comes from env vars (defaults
 shown):
 
 ```bash
@@ -242,8 +244,21 @@ Tier algorithms (each documents its own scoring):
 
 Each backend is hidden behind a `Protocol` (`Embedder`, `EntityRouter`,
 `LLMClient`) with a stub default so CI runs without weights or API
-keys. Production wiring selected via `QONTEXT_ROUTER=gliner2` and
-`QONTEXT_AGENTIC=gemini`.
+keys. Production wiring selected via env:
+
+- `QONTEXT_EMBEDDER=bge` -- uses `BAAI/bge-small-en-v1.5`
+  (`sentence-transformers` ships with the project). Without this the
+  vector arm returns nothing -- run the embedding pass first:
+  `uv run python -m backend.retrieval.embed [--limit N]` writes
+  `:Entity.vector` for matched nodes (idempotent, skips
+  already-embedded).
+- `QONTEXT_ROUTER=gliner2` -- uses fine-tuned GLiNER2; needs
+  `uv add gliner` and weights at `GLINER2_MODEL_PATH` (see
+  `backend/retrieval/router_train/README.md` for the Pioneer.ai
+  fine-tune flow).
+- `QONTEXT_AGENTIC=gemini` -- uses `gemini-2.5-flash`; needs
+  `GEMINI_API_KEY`. Same setting also routes any workflow that needs
+  an LLM (`thread-summary`, `answer-customer-email`).
 
 Built-in workflows:
 
@@ -407,6 +422,48 @@ Re-running `run` on the same source is idempotent: matching
 `(spec_version, source_file, source_record_id, content_hash)` are skipped.
 Renaming a source field aborts the run via drift detection — no silent
 re-inference.
+
+### Bulk ingest — `scripts/ingest_all.sh`
+
+For onboarding the full EnterpriseBench dataset (14 sources) end-to-end in
+one shot, use the bulk script. Idempotent at every layer: onboard skips
+when a YAML already exists, promote is a no-op when already active, and
+record-level dedup means re-runs only ingest new rows.
+
+```bash
+# All 14 sources, then identity resolution.
+bash scripts/ingest_all.sh
+
+# Just one or two by spec-stem name.
+bash scripts/ingest_all.sh emails posts
+
+# Force re-onboard (re-draft the YAML even if it exists).
+FORCE_ONBOARD=1 bash scripts/ingest_all.sh employees
+```
+
+The script post-processes each Gemini-drafted YAML (`normalize_spec_yaml`):
+overwrites `source.file_pattern` with the canonical relative path so the
+subsequent `promote --source-pattern` always matches, and clears
+`required_paths_hash` + `type_fingerprint` so the runtime drift check
+skips on the first ever onboarding (nothing to drift FROM yet).
+
+The onboarder itself (`backend/ingest/onboard.py`) ships with three
+hardenings against Gemini's response_schema quirks:
+
+- **Few-shot reference**: the hand-written `ingest_specs/enterprisebench/emails.yaml`
+  is injected into the draft prompt as a working example. Gemini imitates
+  its structure (especially `@<NodeRule.name>` edge refs and bracket-quoted
+  JSONPath for keys with spaces).
+- **3-round repair loop**: validation failures feed the pydantic error
+  back to Gemini up to 3 times before giving up.
+- **Boundary normalization** (`Onboarder._normalize_llm_output`): strips
+  `when: {}` (Gemini emits empty dicts to mean "no predicate"), forces
+  `required: false` on every FieldMap (the LLM over-marks everything
+  required; the ID is enforced separately via `id_required_fields`),
+  rewrites bare attribute names in `id_required_fields` to JSONPaths via
+  the per-node attribute-to-source map, and bracket-quotes JSONPath
+  segments containing non-identifier characters (`$.Marital Status` →
+  `$['Marital Status']`).
 
 ### Programmatic use
 

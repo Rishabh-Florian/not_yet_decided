@@ -234,9 +234,14 @@ bounded uses only:
    number is captured into `Provenance.model_self_score` for audit but is
    never used to filter or threshold facts (see "Provenance confidence" below).
    A spec with no `llm_blocks` ⇒ zero LLM calls during ingestion.
-3. **One-shot self-repair on drafted specs** — if pydantic validation of a
-   Gemini-drafted spec fails, the validator error is sent back ONCE for
-   repair.
+3. **Bounded self-repair on drafted specs** — `Onboarder.draft_spec`
+   injects a hand-written reference spec (`emails.yaml`) as a few-shot
+   example, applies boundary normalization to the parsed JSON
+   (`Onboarder._normalize_llm_output`: drops `when: {}`, forces
+   `required: false`, JSONPath-bracket-quotes keys with non-identifier
+   chars, rewrites bare `id_required_fields` names to JSONPaths), then
+   pydantic-validates. On failure the validator error is fed back to
+   Gemini for up to 3 repair rounds.
 
 Explicitly **not** used as a fallback:
 - Missing required field → record goes to `dead_letter`, never to an LLM

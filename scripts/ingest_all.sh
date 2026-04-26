@@ -37,16 +37,30 @@ SOURCES=(
 
 mkdir -p "$SPEC_DIR"
 
-# Overwrite source.file_pattern in the drafted YAML with the canonical
-# relative path so promote's --source-pattern always lines up.
-normalize_file_pattern() {
+# Post-process the drafted YAML:
+#  1. Overwrite source.file_pattern with the canonical relative path so
+#     promote's --source-pattern always lines up.
+#  2. Strip required_paths_hash + type_fingerprint. The onboard stamps these
+#     from a 200-record sample, but the runtime drift check uses a 30-record
+#     sample — sparse fields land in the fingerprint and inevitably trip
+#     "declared but missing from observed sample". For first-ever onboarding
+#     there's no baseline to drift FROM, so skip the check (it auto-skips
+#     when both fingerprint fields are None).
+normalize_spec_yaml() {
   local spec="$1" rel_src="$2"
   uv run python - "$spec" "$rel_src" <<'PY'
 import sys, yaml, pathlib
 spec_path, rel_src = sys.argv[1], sys.argv[2]
 data = yaml.safe_load(pathlib.Path(spec_path).read_text(encoding="utf-8"))
+changed = False
 if data["source"].get("file_pattern") != rel_src:
     data["source"]["file_pattern"] = rel_src
+    changed = True
+for k in ("required_paths_hash", "type_fingerprint"):
+    if data.get(k) is not None:
+        data[k] = None
+        changed = True
+if changed:
     pathlib.Path(spec_path).write_text(
         yaml.safe_dump(data, sort_keys=False), encoding="utf-8"
     )
@@ -73,11 +87,15 @@ ingest_one() {
       exit 1
     fi
     echo "  ONBOARD: drafting spec via Gemini..."
+    # --sample-size 200: the LLM still only sees 5 sample records, but a
+    # larger sample is what `type_fingerprint` snapshots. The runtime drift
+    # check uses a 30-record sample, so the onboard sample MUST cover enough
+    # variety to avoid spurious "type changed str -> mixed" drift errors.
     uv run python -m backend.ingest onboard "$src" \
-      --tenant "$TENANT" --out "$spec" --db "$DB"
+      --tenant "$TENANT" --out "$spec" --db "$DB" --sample-size 200
   fi
 
-  normalize_file_pattern "$spec" "$rel_src"
+  normalize_spec_yaml "$spec" "$rel_src"
 
   echo "  PROMOTE..."
   uv run python -m backend.ingest promote \
