@@ -1,0 +1,497 @@
+{"text": "Sum of invoiced amounts for customer morgk 2021-12-30", "entities": [["morgk", "customer_id"], ["2021-12-30", "date"]]}
+{"text": "Tell emp_0246 that ticket 80391 is resolved", "entities": [["emp_0246", "emp_id"], ["80391", "ticket_id"]]}
+{"text": "Show me ticket 19676", "entities": [["19676", "ticket_id"]]}
+{"text": "Customer hungc order history please", "entities": [["hungc", "customer_id"]]}
+{"text": "Total support chats by emp_1031 last week", "entities": [["emp_1031", "emp_id"], ["last week", "date"]]}
+{"text": "never mind", "entities": []}
+{"text": "Pull recent posts from the Engineering team", "entities": [["Engineering", "department"]]}
+{"text": "Show me posts mentioning the AI roadmap", "entities": []}
+{"text": "Surface emails from the HR team", "entities": [["HR", "department"]]}
+{"text": "Compare ticket counts for Sales and BPO", "entities": [["Sales", "department"], ["BPO", "department"]]}
+{"text": "Show projects led by the Information Technology team", "entities": [["Information Technology", "department"]]}
+{"text": "Pull the order placed by customer alfki on Q3 2024", "entities": [["alfki", "customer_id"], ["Q3 2024", "date"]]}
+{"text": "What is the Finance team working on this quarter?", "entities": [["Finance", "department"]]}
+{"text": "Who is the Management lead currently?", "entities": [["Management", "department"]]}
+{"text": "show me", "entities": []}
+{"text": "Top 5 products by revenue this year", "entities": [["this year", "date"]]}
+{"text": "Show projects led by the Management team", "entities": [["Management", "department"]]}
+{"text": "Sum of invoiced amounts for customer reggc 2021-12-30", "entities": [["reggc", "customer_id"], ["2021-12-30", "date"]]}
+{"text": "Customer welli bought D-Link DIR-615 — pull the invoice", "entities": [["welli", "customer_id"], ["D-Link DIR-615", "product"]]}
+{"text": "Who handles Business Development escalations?", "entities": [["Business Development", "department"]]}
+{"text": "Pull recent posts from the BPO team", "entities": [["BPO", "department"]]}
+{"text": "Show complaints filed by customer blaus", "entities": [["blaus", "customer_id"]]}
+{"text": "Pull recent posts from the Management team", "entities": [["Management", "department"]]}
+{"text": "Total sales of B08RWCZ6SY 2022-06-17", "entities": [["B08RWCZ6SY", "product"], ["2022-06-17", "date"]]}
+{"text": "test", "entities": []}
+{"text": "Compare sales for emp_0684 and emp_0972 in 2018-12-02", "entities": [["emp_0684", "emp_id"], ["emp_0972", "emp_id"], ["2018-12-02", "date"]]}
+{"text": "How many resumes were uploaded Q4 2024?", "entities": [["Q4 2024", "date"]]}
+{"text": "bar", "entities": []}
+{"text": "Search BPO strategy docs", "entities": [["BPO", "department"]]}
+{"text": "Find escalation patterns in Management", "entities": [["Management", "department"]]}
+{"text": "Assign ticket 35181 to emp_0865", "entities": [["35181", "ticket_id"], ["emp_0865", "emp_id"]]}
+{"text": "Find ticket 77286 raised by emp_1221 on Q4 2024", "entities": [["77286", "ticket_id"], ["emp_1221", "emp_id"], ["Q4 2024", "date"]]}
+{"text": "Who is the Information Technology lead currently?", "entities": [["Information Technology", "department"]]}
+{"text": "hmm", "entities": []}
+{"text": "data", "entities": []}
+{"text": "Sum of invoiced amounts for customer prini 2024-03-15", "entities": [["prini", "customer_id"], ["2024-03-15", "date"]]}
+{"text": "Move emp_0313 to the Finance team", "entities": [["emp_0313", "emp_id"], ["Finance", "department"]]}
+{"text": "Find feedback on the new performance review cycle", "entities": []}
+{"text": "Compare sales for emp_0622 and emp_9008 in last month", "entities": [["emp_0622", "emp_id"], ["emp_9008", "emp_id"], ["last month", "date"]]}
+{"text": "Get the manager of employee emp_0959", "entities": [["emp_0959", "emp_id"]]}
+{"text": "Move emp_1155 to the Business Development team", "entities": [["emp_1155", "emp_id"], ["Business Development", "department"]]}
+{"text": "Show me employees with python and machine learning skills who joined after 2022", "entities": []}
+{"text": "Show me recent emails about budget reviews", "entities": []}
+{"text": "How many employees joined Engineering July 2023?", "entities": [["Engineering", "department"], ["July 2023", "date"]]}
+{"text": "Top 3 employees by ticket count in Engineering", "entities": [["Engineering", "department"]]}
+{"text": "Find Finance performance reviews", "entities": [["Finance", "department"]]}
+{"text": "How many emails were sent this quarter?", "entities": [["this quarter", "date"]]}
+{"text": "How much did customer seves spend 2019-04-25?", "entities": [["seves", "customer_id"], ["2019-04-25", "date"]]}
+{"text": "not sure", "entities": []}
+{"text": "update", "entities": []}
+{"text": "home", "entities": []}
+{"text": "Tell emp_0269 that ticket 36662 is resolved", "entities": [["emp_0269", "emp_id"], ["36662", "ticket_id"]]}
+{"text": "Show me reviews of product CEDO 65W", "entities": [["CEDO 65W", "product"]]}
+{"text": "Average customer rating for products in the Business Development category", "entities": [["Business Development", "department"]]}
+{"text": "Sum of leaves taken by Engineering team 2021-12-30", "entities": [["Engineering", "department"], ["2021-12-30", "date"]]}
+{"text": "Total sales of Saifsmart Outlet yesterday", "entities": [["Saifsmart Outlet", "product"], ["yesterday", "date"]]}
+{"text": "Trend of B0B3TBY2YX sales over this month", "entities": [["B0B3TBY2YX", "product"], ["this month", "date"]]}
+{"text": "Compare profiles of emp_0159 and emp_0587", "entities": [["emp_0159", "emp_id"], ["emp_0587", "emp_id"]]}
+{"text": "Find emails between emp_1124 and emp_0915", "entities": [["emp_1124", "emp_id"], ["emp_0915", "emp_id"]]}
+{"text": "How much did customer godos spend last quarter?", "entities": [["godos", "customer_id"], ["last quarter", "date"]]}
+{"text": "How much did customer morgk spend 2021-12-30?", "entities": [["morgk", "customer_id"], ["2021-12-30", "date"]]}
+{"text": "settings", "entities": []}
+{"text": "Total sales of B08D9NDZ1Y 2018-12-02", "entities": [["B08D9NDZ1Y", "product"], ["2018-12-02", "date"]]}
+{"text": "Customer lehms bought ZEBRONICS Zeb-Dash — pull the invoice", "entities": [["lehms", "customer_id"], ["ZEBRONICS Zeb-Dash", "product"]]}
+{"text": "Customer frans order history please", "entities": [["frans", "customer_id"]]}
+{"text": "Get details of ticket id 19676", "entities": [["19676", "ticket_id"]]}
+{"text": "Surface emails from the Sales team", "entities": [["Sales", "department"]]}
+{"text": "Send a message to emp_0882 about the deployment", "entities": [["emp_0882", "emp_id"]]}
+{"text": "Sum of leaves taken by Sales team the past 6 months", "entities": [["Sales", "department"], ["the past 6 months", "date"]]}
+{"text": "Show conversations involving emp_1089 from the past 30 days", "entities": [["emp_1089", "emp_id"], ["the past 30 days", "date"]]}
+{"text": "How many emails were sent last quarter?", "entities": [["last quarter", "date"]]}
+{"text": "Compare ticket counts for HR and BPO", "entities": [["HR", "department"], ["BPO", "department"]]}
+{"text": "Pull recent posts from the HR team", "entities": [["HR", "department"]]}
+{"text": "Find the HR team's policy documents", "entities": [["HR", "department"]]}
+{"text": "Find the latest hire in Sales", "entities": [["Sales", "department"]]}
+{"text": "Trend of customer complaints over 2023-10-04", "entities": [["2023-10-04", "date"]]}
+{"text": "Find the Sales department's onboarding docs", "entities": [["Sales", "department"]]}
+{"text": "Find emails sent by emp_0869", "entities": [["emp_0869", "emp_id"]]}
+{"text": "What is the email of emp_0512?", "entities": [["emp_0512", "emp_id"]]}
+{"text": "Update the price of B09VH568H7 to ₹999", "entities": [["B09VH568H7", "product"]]}
+{"text": "Compare ticket counts for BPO and Management", "entities": [["BPO", "department"], ["Management", "department"]]}
+{"text": "List recent hires in HR", "entities": [["HR", "department"]]}
+{"text": "Compare ticket counts for Business Development and Information Technology", "entities": [["Business Development", "department"], ["Information Technology", "department"]]}
+{"text": "Search Sales strategy docs", "entities": [["Sales", "department"]]}
+{"text": "Trend of customer complaints over FY23", "entities": [["FY23", "date"]]}
+{"text": "Pull invoice for customer_id whitc", "entities": [["whitc", "customer_id"]]}
+{"text": "How many employees joined Information Technology Q1 2024?", "entities": [["Information Technology", "department"], ["Q1 2024", "date"]]}
+{"text": "Who handles billing escalations on the customer success team", "entities": []}
+{"text": "Sum of leaves taken by BPO team the past 30 days", "entities": [["BPO", "department"], ["the past 30 days", "date"]]}
+{"text": "Average review rating for product POPIO Tempered", "entities": [["POPIO Tempered", "product"]]}
+{"text": "How many emails were sent 2020-09-02?", "entities": [["2020-09-02", "date"]]}
+{"text": "Show me documentation owned by Information Technology", "entities": [["Information Technology", "department"]]}
+{"text": "Count of VPN outages over FY23", "entities": [["FY23", "date"]]}
+{"text": "Count of VPN outages over last quarter", "entities": [["last quarter", "date"]]}
+{"text": "Pull the order placed by customer ocean on last year", "entities": [["ocean", "customer_id"], ["last year", "date"]]}
+{"text": "Count messages sent by emp_0681 during Q1 2024", "entities": [["emp_0681", "emp_id"], ["Q1 2024", "date"]]}
+{"text": "Show complaints filed by customer bsbev", "entities": [["bsbev", "customer_id"]]}
+{"text": "Notify emp_0545 about the new HR policy", "entities": [["emp_0545", "emp_id"]]}
+{"text": "details", "entities": []}
+{"text": "Top 5 products by revenue Q1 2024", "entities": [["Q1 2024", "date"]]}
+{"text": "Show me Sales team chats", "entities": [["Sales", "department"]]}
+{"text": "Count messages sent by emp_0323 during the past 6 months", "entities": [["emp_0323", "emp_id"], ["the past 6 months", "date"]]}
+{"text": "Find Engineering performance reviews", "entities": [["Engineering", "department"]]}
+{"text": "Sum of invoiced amounts for customer vinet Q3 2024", "entities": [["vinet", "customer_id"], ["Q3 2024", "date"]]}
+{"text": "Top 5 products by revenue last month", "entities": [["last month", "date"]]}
+{"text": "Top 5 products by revenue FY23", "entities": [["FY23", "date"]]}
+{"text": "the system", "entities": []}
+{"text": "Trend of customer complaints over last month", "entities": [["last month", "date"]]}
+{"text": "Count of VPN outages over 2022-06-17", "entities": [["2022-06-17", "date"]]}
+{"text": "Find the Finance department's onboarding docs", "entities": [["Finance", "department"]]}
+{"text": "How many resumes were uploaded 2018-12-02?", "entities": [["2018-12-02", "date"]]}
+{"text": "Find shipping orders for customer_id: romey", "entities": [["romey", "customer_id"]]}
+{"text": "How many active accounts does the customer support team handle daily on average?", "entities": []}
+{"text": "Customer support chats handled by emp_0166 on this year", "entities": [["emp_0166", "emp_id"], ["this year", "date"]]}
+{"text": "click here", "entities": []}
+{"text": "Compare ticket counts for HR and Business Development", "entities": [["HR", "department"], ["Business Development", "department"]]}
+{"text": "results", "entities": []}
+{"text": "Compare sales for emp_9003 and emp_0177 in this month", "entities": [["emp_9003", "emp_id"], ["emp_0177", "emp_id"], ["this month", "date"]]}
+{"text": "How many products were updated March 2024?", "entities": [["March 2024", "date"]]}
+{"text": "Pull catalog entry for product_id House of", "entities": [["House of", "product"]]}
+{"text": "Show complaints filed by customer folko", "entities": [["folko", "customer_id"]]}
+{"text": "Compare ticket counts for Engineering and BPO", "entities": [["Engineering", "department"], ["BPO", "department"]]}
+{"text": "Show me documentation owned by Finance", "entities": [["Finance", "department"]]}
+{"text": "Count tickets raised by emp_1119", "entities": [["emp_1119", "emp_id"]]}
+{"text": "Assign ticket 12578 to emp_0965", "entities": [["12578", "ticket_id"], ["emp_0965", "emp_id"]]}
+{"text": "List vendors used by Finance", "entities": [["Finance", "department"]]}
+{"text": "Find the Engineering department's onboarding docs", "entities": [["Engineering", "department"]]}
+{"text": "Find shipping orders for customer_id: blaus", "entities": [["blaus", "customer_id"]]}
+{"text": "How many tickets did Engineering close 2020-09-02?", "entities": [["Engineering", "department"], ["2020-09-02", "date"]]}
+{"text": "Find threads discussing the security incident", "entities": []}
+{"text": "What is the status of ticket 17226?", "entities": [["17226", "ticket_id"]]}
+{"text": "How many high-priority tickets does emp_1041 have?", "entities": [["emp_1041", "emp_id"]]}
+{"text": "Average resolution time for tickets in Sales", "entities": [["Sales", "department"]]}
+{"text": "Pull the issue description for ticket-6817", "entities": [["6817", "ticket_id"]]}
+{"text": "Who is the Engineering lead currently?", "entities": [["Engineering", "department"]]}
+{"text": "Pull the order placed by customer ernsh on Q1 2024", "entities": [["ernsh", "customer_id"], ["Q1 2024", "date"]]}
+{"text": "Show conversations involving emp_0688 from last month", "entities": [["emp_0688", "emp_id"], ["last month", "date"]]}
+{"text": "Edit the performance rating for emp_0393", "entities": [["emp_0393", "emp_id"]]}
+{"text": "Who is the Sales lead currently?", "entities": [["Sales", "department"]]}
+{"text": "Show me documentation owned by Business Development", "entities": [["Business Development", "department"]]}
+{"text": "Compare ticket counts for Information Technology and Information Technology", "entities": [["Information Technology", "department"], ["Information Technology", "department"]]}
+{"text": "Send a message to emp_1119 about the deployment", "entities": [["emp_1119", "emp_id"]]}
+{"text": "What is the Sales team working on this quarter?", "entities": [["Sales", "department"]]}
+{"text": "What is the status of ticket 31422?", "entities": [["31422", "ticket_id"]]}
+{"text": "Show complaints filed by customer dracd", "entities": [["dracd", "customer_id"]]}
+{"text": "Tell emp_1100 that ticket 4076 is resolved", "entities": [["emp_1100", "emp_id"], ["4076", "ticket_id"]]}
+{"text": "Find emails between emp_0144 and emp_0678", "entities": [["emp_0144", "emp_id"], ["emp_0678", "emp_id"]]}
+{"text": "Find Business Development performance reviews", "entities": [["Business Development", "department"]]}
+{"text": "Find the budget for Engineering", "entities": [["Engineering", "department"]]}
+{"text": "Top 3 employees by ticket count in HR", "entities": [["HR", "department"]]}
+{"text": "Get the manager of employee emp_0974", "entities": [["emp_0974", "emp_id"]]}
+{"text": "hello", "entities": []}
+{"text": "Who handles HR escalations?", "entities": [["HR", "department"]]}
+{"text": "Find the Management department's onboarding docs", "entities": [["Management", "department"]]}
+{"text": "What is the BPO team working on this quarter?", "entities": [["BPO", "department"]]}
+{"text": "back", "entities": []}
+{"text": "How many products were updated 2018-12-02?", "entities": [["2018-12-02", "date"]]}
+{"text": "Show me complaints from the HR division", "entities": [["HR", "department"]]}
+{"text": "How many products were updated Q2 2024?", "entities": [["Q2 2024", "date"]]}
+{"text": "List all repositories owned by emp_1167", "entities": [["emp_1167", "emp_id"]]}
+{"text": "Find the Finance team's policy documents", "entities": [["Finance", "department"]]}
+{"text": "Pull recent posts from the Finance team", "entities": [["Finance", "department"]]}
+{"text": "Average customer rating for products in the BPO category", "entities": [["BPO", "department"]]}
+{"text": "Count tickets raised by emp_0048", "entities": [["emp_0048", "emp_id"]]}
+{"text": "Find emails between emp_1189 and emp_1244", "entities": [["emp_1189", "emp_id"], ["emp_1244", "emp_id"]]}
+{"text": "How many resumes were uploaded Q3 2024?", "entities": [["Q3 2024", "date"]]}
+{"text": "What is the status of ticket 27009?", "entities": [["27009", "ticket_id"]]}
+{"text": "the thing", "entities": []}
+{"text": "Edit the performance rating for emp_0543", "entities": [["emp_0543", "emp_id"]]}
+{"text": "Send a message from emp_0649 to emp_0149 about Q3 review", "entities": [["emp_0649", "emp_id"], ["emp_0149", "emp_id"]]}
+{"text": "Update the price of PHILIPS HL1655/00 to ₹999", "entities": [["PHILIPS HL1655/00", "product"]]}
+{"text": "Email emp_0452 from the Sales department about onboarding", "entities": [["emp_0452", "emp_id"], ["Sales", "department"]]}
+{"text": "Sum of leaves taken by Sales team Q1 2023", "entities": [["Sales", "department"], ["Q1 2023", "date"]]}
+{"text": "Edit the performance rating for emp_0538", "entities": [["emp_0538", "emp_id"]]}
+{"text": "Move emp_0150 to the Sales team", "entities": [["emp_0150", "emp_id"], ["Sales", "department"]]}
+{"text": "Surface emails from the Finance team", "entities": [["Finance", "department"]]}
+{"text": "List all repositories owned by emp_0103", "entities": [["emp_0103", "emp_id"]]}
+{"text": "Who manages HR?", "entities": [["HR", "department"]]}
+{"text": "Customer vaffe bought B092JHPL72 — pull the invoice", "entities": [["vaffe", "customer_id"], ["B092JHPL72", "product"]]}
+{"text": "How many high-priority tickets does emp_0285 have?", "entities": [["emp_0285", "emp_id"]]}
+{"text": "Resolve ticket 35181 please", "entities": [["35181", "ticket_id"]]}
+{"text": "Trend of email volume in Management", "entities": [["Management", "department"]]}
+{"text": "Notify emp_1133 about the new HR policy", "entities": [["emp_1133", "emp_id"]]}
+{"text": "How much did customer ocean spend FY24?", "entities": [["ocean", "customer_id"], ["FY24", "date"]]}
+{"text": "Find the Engineering team's policy documents", "entities": [["Engineering", "department"]]}
+{"text": "Who manages Business Development?", "entities": [["Business Development", "department"]]}
+{"text": "Who handles Sales escalations?", "entities": [["Sales", "department"]]}
+{"text": "Get the manager of employee emp_0906", "entities": [["emp_0906", "emp_id"]]}
+{"text": "List recent hires in Sales", "entities": [["Sales", "department"]]}
+{"text": "Pull invoice for customer_id hungc", "entities": [["hungc", "customer_id"]]}
+{"text": "Show me Business Development team chats", "entities": [["Business Development", "department"]]}
+{"text": "Get product details for boAt Wave", "entities": [["boAt Wave", "product"]]}
+{"text": "Get details of ticket id 45964", "entities": [["45964", "ticket_id"]]}
+{"text": "error message", "entities": []}
+{"text": "Compare ticket counts for Information Technology and Sales", "entities": [["Information Technology", "department"], ["Sales", "department"]]}
+{"text": "Find Finance training materials", "entities": [["Finance", "department"]]}
+{"text": "Show complaints filed by customer maisd", "entities": [["maisd", "customer_id"]]}
+{"text": "Find the latest hire in Finance", "entities": [["Finance", "department"]]}
+{"text": "Show me documentation owned by Engineering", "entities": [["Engineering", "department"]]}
+{"text": "Find sales of B07B275VN9 this year", "entities": [["B07B275VN9", "product"]]}
+{"text": "Pull invoice for customer_id hilaa", "entities": [["hilaa", "customer_id"]]}
+{"text": "Update the price of Lenovo 130 to ₹999", "entities": [["Lenovo 130", "product"]]}
+{"text": "Find roadmap discussions about mobile app", "entities": []}
+{"text": "Find sales of B09H7JDJCW this year", "entities": [["B09H7JDJCW", "product"]]}
+{"text": "retry", "entities": []}
+{"text": "thanks", "entities": []}
+{"text": "Customer godos order history please", "entities": [["godos", "customer_id"]]}
+{"text": "What is the email of emp_0645?", "entities": [["emp_0645", "emp_id"]]}
+{"text": "Notify emp_1157 about the new HR policy", "entities": [["emp_1157", "emp_id"]]}
+{"text": "Sum of invoiced amounts for customer quede this month", "entities": [["quede", "customer_id"], ["this month", "date"]]}
+{"text": "List vendors used by Business Development", "entities": [["Business Development", "department"]]}
+{"text": "Show me reviews of product Havells Aqua", "entities": [["Havells Aqua", "product"]]}
+{"text": "Find the budget for BPO", "entities": [["BPO", "department"]]}
+{"text": "Show me threads about the conference talk submissions", "entities": []}
+{"text": "fix this", "entities": []}
+{"text": "Customer savea bought Zebronics ZEB-VITA — pull the invoice", "entities": [["savea", "customer_id"], ["Zebronics ZEB-VITA", "product"]]}
+{"text": "Get product details for B08HLZ28QC", "entities": [["B08HLZ28QC", "product"]]}
+{"text": "Edit the performance rating for emp_0086", "entities": [["emp_0086", "emp_id"]]}
+{"text": "Find the budget for Sales", "entities": [["Sales", "department"]]}
+{"text": "Find emails sent by emp_0381", "entities": [["emp_0381", "emp_id"]]}
+{"text": "Compare sales for emp_0091 and emp_0723 in January 2024", "entities": [["emp_0091", "emp_id"], ["emp_0723", "emp_id"], ["January 2024", "date"]]}
+{"text": "Show me ticket 60302", "entities": [["60302", "ticket_id"]]}
+{"text": "How much did customer quede spend Q3 2023?", "entities": [["quede", "customer_id"], ["Q3 2023", "date"]]}
+{"text": "xyz", "entities": []}
+{"text": "Compare sales for emp_0138 and emp_0484 in July 2023", "entities": [["emp_0138", "emp_id"], ["emp_0484", "emp_id"], ["July 2023", "date"]]}
+{"text": "Trend of B0B4T6MR8N sales over Q4 2024", "entities": [["B0B4T6MR8N", "product"], ["Q4 2024", "date"]]}
+{"text": "Who handles BPO escalations?", "entities": [["BPO", "department"]]}
+{"text": "Count messages sent by emp_0964 during this week", "entities": [["emp_0964", "emp_id"], ["this week", "date"]]}
+{"text": "Count of VPN outages over Q4 2024", "entities": [["Q4 2024", "date"]]}
+{"text": "Compare sales for emp_0543 and emp_0751 in FY23", "entities": [["emp_0543", "emp_id"], ["emp_0751", "emp_id"], ["FY23", "date"]]}
+{"text": "Show me the latest performance reviews", "entities": []}
+{"text": "Pull recent posts from the Sales team", "entities": [["Sales", "department"]]}
+{"text": "Find policy documents about remote work", "entities": []}
+{"text": "Compare emp_0871 and emp_0162 performance over 2024-03-15", "entities": [["emp_0871", "emp_id"], ["emp_0162", "emp_id"], ["2024-03-15", "date"]]}
+{"text": "?", "entities": []}
+{"text": "Total support chats by emp_0821 2023-10-04", "entities": [["emp_0821", "emp_id"], ["2023-10-04", "date"]]}
+{"text": "Find documentation on the API rate limits", "entities": []}
+{"text": "Show me Information Technology team chats", "entities": [["Information Technology", "department"]]}
+{"text": "hi", "entities": []}
+{"text": "Show me messages from the customer success channel", "entities": []}
+{"text": "Find sales of Sounce Gold this year", "entities": [["Sounce Gold", "product"]]}
+{"text": "Sum of invoiced amounts for customer linod last week", "entities": [["linod", "customer_id"], ["last week", "date"]]}
+{"text": "How many emails were sent Q3 2024?", "entities": [["Q3 2024", "date"]]}
+{"text": "Find emails between emp_0449 and emp_0361", "entities": [["emp_0449", "emp_id"], ["emp_0361", "emp_id"]]}
+{"text": "Open a new issue for emp_0302 in the repo", "entities": [["emp_0302", "emp_id"]]}
+{"text": "How many products were updated 2023-10-04?", "entities": [["2023-10-04", "date"]]}
+{"text": "Pull invoice for customer_id eastc", "entities": [["eastc", "customer_id"]]}
+{"text": "Compare revenue between dumon and santg in July 2023", "entities": [["dumon", "customer_id"], ["santg", "customer_id"], ["July 2023", "date"]]}
+{"text": "Average salary by department", "entities": []}
+{"text": "Show conversations involving emp_0971 from the past 30 days", "entities": [["emp_0971", "emp_id"], ["the past 30 days", "date"]]}
+{"text": "Search for resumes with React and TypeScript experience", "entities": []}
+{"text": "What is the status of ticket 20535?", "entities": [["20535", "ticket_id"]]}
+{"text": "What is the status of ticket 4870?", "entities": [["4870", "ticket_id"]]}
+{"text": "Find quarterly business review summaries", "entities": []}
+{"text": "Who handles Information Technology escalations?", "entities": [["Information Technology", "department"]]}
+{"text": "Count messages sent by emp_0221 during 2024-03-15", "entities": [["emp_0221", "emp_id"], ["2024-03-15", "date"]]}
+{"text": "Count of VPN outages over this week", "entities": [["this week", "date"]]}
+{"text": "Pull invoice for customer_id famia", "entities": [["famia", "customer_id"]]}
+{"text": "Get the manager of employee emp_0222", "entities": [["emp_0222", "emp_id"]]}
+{"text": "Find emails sent by emp_0583", "entities": [["emp_0583", "emp_id"]]}
+{"text": "Find the BPO department's onboarding docs", "entities": [["BPO", "department"]]}
+{"text": "Top 3 employees by ticket count in Management", "entities": [["Management", "department"]]}
+{"text": "Show me complaints from the Management division", "entities": [["Management", "department"]]}
+{"text": "Resolve ticket 12671 please", "entities": [["12671", "ticket_id"]]}
+{"text": "Average review rating for product B09PTT8DZF", "entities": [["B09PTT8DZF", "product"]]}
+{"text": "Find BPO performance reviews", "entities": [["BPO", "department"]]}
+{"text": "Pull invoice for customer_id thebi", "entities": [["thebi", "customer_id"]]}
+{"text": "Find escalation patterns in BPO", "entities": [["BPO", "department"]]}
+{"text": "Total support chats by emp_0004 March 2024", "entities": [["emp_0004", "emp_id"], ["March 2024", "date"]]}
+{"text": "How much did customer lonep spend this month?", "entities": [["lonep", "customer_id"], ["this month", "date"]]}
+{"text": "Find escalation patterns in Finance", "entities": [["Finance", "department"]]}
+{"text": "Show me Engineering team chats", "entities": [["Engineering", "department"]]}
+{"text": "Count tickets raised by emp_0953", "entities": [["emp_0953", "emp_id"]]}
+{"text": "Show me Finance team chats", "entities": [["Finance", "department"]]}
+{"text": "Find the Sales team's policy documents", "entities": [["Sales", "department"]]}
+{"text": "List recent hires in Information Technology", "entities": [["Information Technology", "department"]]}
+{"text": "Rank departments by ticket volume last week", "entities": [["last week", "date"]]}
+{"text": "Resolve ticket 30197 please", "entities": [["30197", "ticket_id"]]}
+{"text": "Show me reviews of product Smashtronics® -", "entities": [["Smashtronics® -", "product"]]}
+{"text": "got it", "entities": []}
+{"text": "Assign ticket 23492 to emp_0439", "entities": [["23492", "ticket_id"], ["emp_0439", "emp_id"]]}
+{"text": "Email emp_1049 from the Business Development department about onboarding", "entities": [["emp_1049", "emp_id"], ["Business Development", "department"]]}
+{"text": "Average resolution time for tickets in Management", "entities": [["Management", "department"]]}
+{"text": "Resolve ticket 88806 please", "entities": [["88806", "ticket_id"]]}
+{"text": "Count tickets raised by emp_0502", "entities": [["emp_0502", "emp_id"]]}
+{"text": "Show profile for emp_0155", "entities": [["emp_0155", "emp_id"]]}
+{"text": "more info", "entities": []}
+{"text": "Total sales of B01F262EUU yesterday", "entities": [["B01F262EUU", "product"], ["yesterday", "date"]]}
+{"text": "Show complaints filed by customer ricar", "entities": [["ricar", "customer_id"]]}
+{"text": "Find the Business Development department's onboarding docs", "entities": [["Business Development", "department"]]}
+{"text": "How many resumes were uploaded Q2 2023?", "entities": [["Q2 2023", "date"]]}
+{"text": "error", "entities": []}
+{"text": "Find escalation patterns in Information Technology", "entities": [["Information Technology", "department"]]}
+{"text": "status", "entities": []}
+{"text": "Average resolution time for tickets in Finance", "entities": [["Finance", "department"]]}
+{"text": "Show projects led by the Sales team", "entities": [["Sales", "department"]]}
+{"text": "Get product details for B099S26HWG", "entities": [["B099S26HWG", "product"]]}
+{"text": "admin", "entities": []}
+{"text": "Show me complaints from the Sales division", "entities": [["Sales", "department"]]}
+{"text": "Who handles Management escalations?", "entities": [["Management", "department"]]}
+{"text": "Assign ticket 42261 to emp_0830", "entities": [["42261", "ticket_id"], ["emp_0830", "emp_id"]]}
+{"text": "Find Management performance reviews", "entities": [["Management", "department"]]}
+{"text": "Surface emails from the Information Technology team", "entities": [["Information Technology", "department"]]}
+{"text": "List recent hires in Business Development", "entities": [["Business Development", "department"]]}
+{"text": "foo", "entities": []}
+{"text": "Show me complaints from the Information Technology division", "entities": [["Information Technology", "department"]]}
+{"text": "Trend of email volume in Finance", "entities": [["Finance", "department"]]}
+{"text": "info", "entities": []}
+{"text": "What is the Information Technology team working on this quarter?", "entities": [["Information Technology", "department"]]}
+{"text": "Assign ticket 66209 to emp_0820", "entities": [["66209", "ticket_id"], ["emp_0820", "emp_id"]]}
+{"text": "Show me reviews of product Havells Instanio", "entities": [["Havells Instanio", "product"]]}
+{"text": "Find docs about the customer onboarding process", "entities": []}
+{"text": "Compare sales for emp_0624 and emp_0338 in the past 30 days", "entities": [["emp_0624", "emp_id"], ["emp_0338", "emp_id"], ["the past 30 days", "date"]]}
+{"text": "List recent hires in Engineering", "entities": [["Engineering", "department"]]}
+{"text": "Find the latest hire in HR", "entities": [["HR", "department"]]}
+{"text": "Pull recent posts from the Information Technology team", "entities": [["Information Technology", "department"]]}
+{"text": "How many high-priority tickets does emp_0409 have?", "entities": [["emp_0409", "emp_id"]]}
+{"text": "again", "entities": []}
+{"text": "Customer support chats handled by emp_0404 on July 2023", "entities": [["emp_0404", "emp_id"], ["July 2023", "date"]]}
+{"text": "Count messages sent by emp_0328 during Q4 2024", "entities": [["emp_0328", "emp_id"], ["Q4 2024", "date"]]}
+{"text": "Find the latest hire in Management", "entities": [["Management", "department"]]}
+{"text": "Move emp_1085 to the BPO team", "entities": [["emp_1085", "emp_id"], ["BPO", "department"]]}
+{"text": "Average review rating for product boAt Deuce", "entities": [["boAt Deuce", "product"]]}
+{"text": "Search posts about diversity initiatives", "entities": []}
+{"text": "How many employees joined Sales Q1 2024?", "entities": [["Sales", "department"], ["Q1 2024", "date"]]}
+{"text": "Sum of leaves taken by Sales team July 2023", "entities": [["Sales", "department"], ["July 2023", "date"]]}
+{"text": "How many products were updated January 2024?", "entities": [["January 2024", "date"]]}
+{"text": "Find the latest hire in Business Development", "entities": [["Business Development", "department"]]}
+{"text": "List all repositories owned by emp_0846", "entities": [["emp_0846", "emp_id"]]}
+{"text": "Count tickets raised by emp_1056", "entities": [["emp_1056", "emp_id"]]}
+{"text": "Find escalation patterns in Sales", "entities": [["Sales", "department"]]}
+{"text": "Find the latest hire in BPO", "entities": [["BPO", "department"]]}
+{"text": "Find the budget for HR", "entities": [["HR", "department"]]}
+{"text": "Edit the performance rating for emp_1095", "entities": [["emp_1095", "emp_id"]]}
+{"text": "Who is the BPO lead currently?", "entities": [["BPO", "department"]]}
+{"text": "Who manages Sales?", "entities": [["Sales", "department"]]}
+{"text": "Sum of invoiced amounts for customer frans this week", "entities": [["frans", "customer_id"], ["this week", "date"]]}
+{"text": "List recent hires in Management", "entities": [["Management", "department"]]}
+{"text": "Find Sales performance reviews", "entities": [["Sales", "department"]]}
+{"text": "help", "entities": []}
+{"text": "Pull the chat between emp_0040 and emp_1106 on last week", "entities": [["emp_0040", "emp_id"], ["emp_1106", "emp_id"], ["last week", "date"]]}
+{"text": "Compare revenue between linod and blonp in last week", "entities": [["linod", "customer_id"], ["blonp", "customer_id"], ["last week", "date"]]}
+{"text": "Show me complaints from the Business Development division", "entities": [["Business Development", "department"]]}
+{"text": "What is the email of emp_0862?", "entities": [["emp_0862", "emp_id"]]}
+{"text": "Who manages BPO?", "entities": [["BPO", "department"]]}
+{"text": "forget it", "entities": []}
+{"text": "Trend of email volume in Business Development", "entities": [["Business Development", "department"]]}
+{"text": "How many high-priority tickets does emp_0742 have?", "entities": [["emp_0742", "emp_id"]]}
+{"text": "Compare revenue between thebi and ernsh in the past 30 days", "entities": [["thebi", "customer_id"], ["ernsh", "customer_id"], ["the past 30 days", "date"]]}
+{"text": "Tell emp_0674 that ticket 35181 is resolved", "entities": [["emp_0674", "emp_id"], ["35181", "ticket_id"]]}
+{"text": "open", "entities": []}
+{"text": "Compare profiles of emp_9004 and emp_1035", "entities": [["emp_9004", "emp_id"], ["emp_1035", "emp_id"]]}
+{"text": "Email emp_0082 from the Business Development department about onboarding", "entities": [["emp_0082", "emp_id"], ["Business Development", "department"]]}
+{"text": "Surface emails from the Business Development team", "entities": [["Business Development", "department"]]}
+{"text": "Who owns the inazuma analytics dashboard repository", "entities": []}
+{"text": "Edit the performance rating for emp_0953", "entities": [["emp_0953", "emp_id"]]}
+{"text": "Who manages Engineering?", "entities": [["Engineering", "department"]]}
+{"text": "everything", "entities": []}
+{"text": "Search HR strategy docs", "entities": [["HR", "department"]]}
+{"text": "Top 3 employees by ticket count in BPO", "entities": [["BPO", "department"]]}
+{"text": "How many resumes were uploaded 2021-12-30?", "entities": [["2021-12-30", "date"]]}
+{"text": "yes", "entities": []}
+{"text": "Pull the order placed by customer ottik on today", "entities": [["ottik", "customer_id"], ["today", "date"]]}
+{"text": "Pull invoice for customer_id magaa", "entities": [["magaa", "customer_id"]]}
+{"text": "Top 5 products by revenue last week", "entities": [["last week", "date"]]}
+{"text": "How many emails were sent FY24?", "entities": [["FY24", "date"]]}
+{"text": "Sum of invoiced amounts for customer savea today", "entities": [["savea", "customer_id"], ["today", "date"]]}
+{"text": "Find issues mentioning slow VPN connectivity", "entities": []}
+{"text": "Find emails between emp_0278 and emp_0947", "entities": [["emp_0278", "emp_id"], ["emp_0947", "emp_id"]]}
+{"text": "Show profile for emp_0220", "entities": [["emp_0220", "emp_id"]]}
+{"text": "Pull invoice for customer_id quick", "entities": [["quick", "customer_id"]]}
+{"text": "How much did customer merep spend last quarter?", "entities": [["merep", "customer_id"], ["last quarter", "date"]]}
+{"text": "List vendors used by BPO", "entities": [["BPO", "department"]]}
+{"text": "Who is emp_0726?", "entities": [["emp_0726", "emp_id"]]}
+{"text": "What was the agreed payment term in the last vendor contract for cloud services?", "entities": []}
+{"text": "Find the Information Technology department's onboarding docs", "entities": [["Information Technology", "department"]]}
+{"text": "Get details of ticket id 46980", "entities": [["46980", "ticket_id"]]}
+{"text": "Average ticket resolution time per department", "entities": []}
+{"text": "Find the Management team's policy documents", "entities": [["Management", "department"]]}
+{"text": "Find ticket 60745 raised by emp_0103 on Q3 2023", "entities": [["60745", "ticket_id"], ["emp_0103", "emp_id"], ["Q3 2023", "date"]]}
+{"text": "Find emails between emp_0996 and emp_0060", "entities": [["emp_0996", "emp_id"], ["emp_0060", "emp_id"]]}
+{"text": "Get GitHub commits from emp_0781 in 2021-12-30", "entities": [["emp_0781", "emp_id"], ["2021-12-30", "date"]]}
+{"text": "Who is the Finance lead currently?", "entities": [["Finance", "department"]]}
+{"text": "Email emp_0891 from the Information Technology department about onboarding", "entities": [["emp_0891", "emp_id"], ["Information Technology", "department"]]}
+{"text": "Who handles Engineering escalations?", "entities": [["Engineering", "department"]]}
+{"text": "How many emails were sent 2022-06-17?", "entities": [["2022-06-17", "date"]]}
+{"text": "How much did customer vinet spend the past 30 days?", "entities": [["vinet", "customer_id"], ["the past 30 days", "date"]]}
+{"text": "How many employees joined Management Q3 2023?", "entities": [["Management", "department"], ["Q3 2023", "date"]]}
+{"text": "What is the Management team working on this quarter?", "entities": [["Management", "department"]]}
+{"text": "Pull catalog entry for product_id B097MKZHNV", "entities": [["B097MKZHNV", "product"]]}
+{"text": "What is the HR team working on this quarter?", "entities": [["HR", "department"]]}
+{"text": "Average review rating for product SWAPKART Fast", "entities": [["SWAPKART Fast", "product"]]}
+{"text": "Compare ticket counts for Management and BPO", "entities": [["Management", "department"], ["BPO", "department"]]}
+{"text": "Rank departments by ticket volume the past year", "entities": [["the past year", "date"]]}
+{"text": "Pull catalog entry for product_id B0BHYJ8CVF", "entities": [["B0BHYJ8CVF", "product"]]}
+{"text": "loading data", "entities": []}
+{"text": "Who is the Business Development lead currently?", "entities": [["Business Development", "department"]]}
+{"text": "What is the Business Development team working on this quarter?", "entities": [["Business Development", "department"]]}
+{"text": "makes sense", "entities": []}
+{"text": "Show me reviews of product B09HK9JH4F", "entities": [["B09HK9JH4F", "product"]]}
+{"text": "Show projects led by the HR team", "entities": [["HR", "department"]]}
+{"text": "Compare sales for emp_0199 and emp_0104 in Q2 2024", "entities": [["emp_0199", "emp_id"], ["emp_0104", "emp_id"], ["Q2 2024", "date"]]}
+{"text": "Move emp_0644 to the Business Development team", "entities": [["emp_0644", "emp_id"], ["Business Development", "department"]]}
+{"text": "List vendors used by Management", "entities": [["Management", "department"]]}
+{"text": "Show me BPO team chats", "entities": [["BPO", "department"]]}
+{"text": "Compare emp_0724 and emp_9009 performance over 2024-03-15", "entities": [["emp_0724", "emp_id"], ["emp_9009", "emp_id"], ["2024-03-15", "date"]]}
+{"text": "Compare revenue between specd and franr in July 2023", "entities": [["specd", "customer_id"], ["franr", "customer_id"], ["July 2023", "date"]]}
+{"text": "List vendors used by Information Technology", "entities": [["Information Technology", "department"]]}
+{"text": "Average resolution time for tickets in HR", "entities": [["HR", "department"]]}
+{"text": "Search Finance strategy docs", "entities": [["Finance", "department"]]}
+{"text": "Average customer rating for products in the Management category", "entities": [["Management", "department"]]}
+{"text": "How many high-priority tickets does emp_0277 have?", "entities": [["emp_0277", "emp_id"]]}
+{"text": "Find all support chats about coffee frother complaints", "entities": []}
+{"text": "submit", "entities": []}
+{"text": "Search Engineering strategy docs", "entities": [["Engineering", "department"]]}
+{"text": "Show me complaints from the BPO division", "entities": [["BPO", "department"]]}
+{"text": "Find escalation patterns in HR", "entities": [["HR", "department"]]}
+{"text": "Rank departments by ticket volume last month", "entities": [["last month", "date"]]}
+{"text": "Trend of B00LZLQ624 sales over October 2022", "entities": [["B00LZLQ624", "product"], ["October 2022", "date"]]}
+{"text": "Compare profiles of emp_0907 and emp_0438", "entities": [["emp_0907", "emp_id"], ["emp_0438", "emp_id"]]}
+{"text": "Count messages sent by emp_0152 during 2023-10-04", "entities": [["emp_0152", "emp_id"], ["2023-10-04", "date"]]}
+{"text": "Average review rating for product B008YW8M0G", "entities": [["B008YW8M0G", "product"]]}
+{"text": "Find Engineering training materials", "entities": [["Engineering", "department"]]}
+{"text": "Did emp_0515 send any emails on last week?", "entities": [["emp_0515", "emp_id"], ["last week", "date"]]}
+{"text": "Update the price of B09BF8JBWX to ₹999", "entities": [["B09BF8JBWX", "product"]]}
+{"text": "Find emails about the Q1 hiring freeze", "entities": []}
+{"text": "Find HR training materials", "entities": [["HR", "department"]]}
+{"text": "Did emp_0490 send any emails on Q1 2024?", "entities": [["emp_0490", "emp_id"], ["Q1 2024", "date"]]}
+{"text": "Find Business Development training materials", "entities": [["Business Development", "department"]]}
+{"text": "dashboard", "entities": []}
+{"text": "Find emails between emp_0004 and emp_1066", "entities": [["emp_0004", "emp_id"], ["emp_1066", "emp_id"]]}
+{"text": "Search Information Technology strategy docs", "entities": [["Information Technology", "department"]]}
+{"text": "Send a message from emp_0853 to emp_0128 about Q3 review", "entities": [["emp_0853", "emp_id"], ["emp_0128", "emp_id"]]}
+{"text": "Find escalation patterns in Business Development", "entities": [["Business Development", "department"]]}
+{"text": "Count messages sent by emp_0655 during March 2024", "entities": [["emp_0655", "emp_id"], ["March 2024", "date"]]}
+{"text": "okay", "entities": []}
+{"text": "Compare ticket counts for Engineering and Engineering", "entities": [["Engineering", "department"], ["Engineering", "department"]]}
+{"text": "null", "entities": []}
+{"text": "Find escalation patterns in Engineering", "entities": [["Engineering", "department"]]}
+{"text": "Show projects led by the Business Development team", "entities": [["Business Development", "department"]]}
+{"text": "Find Information Technology performance reviews", "entities": [["Information Technology", "department"]]}
+{"text": "Sum of leaves taken by Sales team the past year", "entities": [["Sales", "department"], ["the past year", "date"]]}
+{"text": "Average review rating for product Ikea Little", "entities": [["Ikea Little", "product"]]}
+{"text": "ok thanks", "entities": []}
+{"text": "Open a new issue for emp_0042 in the repo", "entities": [["emp_0042", "emp_id"]]}
+{"text": "Who manages Finance?", "entities": [["Finance", "department"]]}
+{"text": "Assign ticket 8264 to emp_0390", "entities": [["8264", "ticket_id"], ["emp_0390", "emp_id"]]}
+{"text": "Get product details for B099Z83VRC", "entities": [["B099Z83VRC", "product"]]}
+{"text": "Total sales of B081NHWT6Z 2018-12-02", "entities": [["B081NHWT6Z", "product"], ["2018-12-02", "date"]]}
+{"text": "Total sales of B07YTNKVJQ this year", "entities": [["B07YTNKVJQ", "product"], ["this year", "date"]]}
+{"text": "How many tickets did Information Technology close July 2023?", "entities": [["Information Technology", "department"], ["July 2023", "date"]]}
+{"text": "Compare profiles of emp_0532 and emp_0507", "entities": [["emp_0532", "emp_id"], ["emp_0507", "emp_id"]]}
+{"text": "Find Management training materials", "entities": [["Management", "department"]]}
+{"text": "Resolve ticket 51450 please", "entities": [["51450", "ticket_id"]]}
+{"text": "Find the latest hire in Engineering", "entities": [["Engineering", "department"]]}
+{"text": "Pull recent posts from the Business Development team", "entities": [["Business Development", "department"]]}
+{"text": "Compare profiles of emp_1114 and emp_0621", "entities": [["emp_1114", "emp_id"], ["emp_0621", "emp_id"]]}
+{"text": "Sum of leaves taken by Business Development team Q2 2024", "entities": [["Business Development", "department"], ["Q2 2024", "date"]]}
+{"text": "Show me ticket 45094", "entities": [["45094", "ticket_id"]]}
+{"text": "Pull the order placed by customer lacor on this quarter", "entities": [["lacor", "customer_id"], ["this quarter", "date"]]}
+{"text": "How much did customer blaus spend this week?", "entities": [["blaus", "customer_id"], ["this week", "date"]]}
+{"text": "Compare sales for emp_1246 and emp_0899 in this week", "entities": [["emp_1246", "emp_id"], ["emp_0899", "emp_id"], ["this week", "date"]]}
+{"text": "Trend of customer complaints over 2020-09-02", "entities": [["2020-09-02", "date"]]}
+{"text": "Total support chats by emp_0228 Q2 2024", "entities": [["emp_0228", "emp_id"], ["Q2 2024", "date"]]}
+{"text": "Show me Management team chats", "entities": [["Management", "department"]]}
+{"text": "What is the email of emp_1038?", "entities": [["emp_1038", "emp_id"]]}
+{"text": "How many tickets did HR close Q1 2023?", "entities": [["HR", "department"], ["Q1 2023", "date"]]}
+{"text": "What is the status of ticket 2616?", "entities": [["2616", "ticket_id"]]}
+{"text": "Show me ticket 42237", "entities": [["42237", "ticket_id"]]}
+{"text": "Show profile for emp_0936", "entities": [["emp_0936", "emp_id"]]}
+{"text": "Assign ticket 85220 to emp_0041", "entities": [["85220", "ticket_id"], ["emp_0041", "emp_id"]]}
+{"text": "Customer warth bought Themisto TH-WS20 — pull the invoice", "entities": [["warth", "customer_id"], ["Themisto TH-WS20", "product"]]}
+{"text": "query", "entities": []}
+{"text": "close", "entities": []}
+{"text": "Average resolution time for tickets in Business Development", "entities": [["Business Development", "department"]]}
+{"text": "Sum of leaves taken by Engineering team Q2 2024", "entities": [["Engineering", "department"], ["Q2 2024", "date"]]}
+{"text": "List vendors used by HR", "entities": [["HR", "department"]]}
+{"text": "Rank departments by ticket volume this week", "entities": [["this week", "date"]]}
+{"text": "How many high-priority tickets does emp_0833 have?", "entities": [["emp_0833", "emp_id"]]}
+{"text": "Resolve ticket 717 please", "entities": [["717", "ticket_id"]]}
+{"text": "Send a message from emp_0718 to emp_0627 about Q3 review", "entities": [["emp_0718", "emp_id"], ["emp_0627", "emp_id"]]}
+{"text": "Total sales of B07DZ986Q2 this year", "entities": [["B07DZ986Q2", "product"], ["this year", "date"]]}
+{"text": "Rank departments by ticket volume Q4 2023", "entities": [["Q4 2023", "date"]]}
+{"text": "Average review rating for product B08D77XZX5", "entities": [["B08D77XZX5", "product"]]}
+{"text": "the page", "entities": []}
+{"text": "What is the status of ticket 12909?", "entities": [["12909", "ticket_id"]]}
+{"text": "Send a message from emp_0671 to emp_0693 about Q3 review", "entities": [["emp_0671", "emp_id"], ["emp_0693", "emp_id"]]}
+{"text": "Update the price of HP GK320 to ₹999", "entities": [["HP GK320", "product"]]}
+{"text": "Find the budget for Information Technology", "entities": [["Information Technology", "department"]]}
+{"text": "Show me HR team chats", "entities": [["HR", "department"]]}
+{"text": "Show me reviews of product Elv Aluminium", "entities": [["Elv Aluminium", "product"]]}
+{"text": "Send a message to emp_0474 about the deployment", "entities": [["emp_0474", "emp_id"]]}
+{"text": "How much did customer specd spend this quarter?", "entities": [["specd", "customer_id"], ["this quarter", "date"]]}
+{"text": "Find the resume for the senior backend engineer with kubernetes experience", "entities": []}
+{"text": "Find the Information Technology team's policy documents", "entities": [["Information Technology", "department"]]}
+{"text": "Show me complaints from the Engineering division", "entities": [["Engineering", "department"]]}
+{"text": "List recent hires in BPO", "entities": [["BPO", "department"]]}
