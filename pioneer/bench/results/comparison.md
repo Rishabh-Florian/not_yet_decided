@@ -1,44 +1,93 @@
 # Pioneer GLiNER2 fine-tune — eval comparison
 
-> Fill in once Phase 0 (Pioneer baseline + GPT-4o) and Phase 3
-> (fine-tuned local) results land. The headline numbers below feed the
-> side-challenge submission.
-
 ## Eval set
 
 `pioneer/seeds/eval_set.jsonl` — 45 held-out queries (30 lookup / 7
 search / 4 analytical / 4 ambiguous). Schema: 4-way intent +
 6 entity types.
 
-## Three-column comparison
+## Round 1 results (2026-04-26)
 
-| Metric | Base GLiNER2 (Pioneer eval) | GPT-4o (Pioneer eval) | Fine-tuned GLiNER2 (local) | Δ vs base | Δ vs GPT-4o |
+| Metric | Base GLiNER2 | GPT-4o | Fine-tuned v1 | Δ vs base | Δ vs GPT-4o |
 |---|---|---|---|---|---|
-| Intent accuracy | TBD | TBD | TBD | TBD | TBD |
-| Macro NER F1 | TBD | TBD | TBD | TBD | TBD |
-| Per-entity F1 — `emp_id` | TBD | TBD | TBD | TBD | TBD |
-| Per-entity F1 — `customer_id` | TBD | TBD | TBD | TBD | TBD |
-| Per-entity F1 — `ticket_id` | TBD | TBD | TBD | TBD | TBD |
-| Per-entity F1 — `date` | TBD | TBD | TBD | TBD | TBD |
-| Per-entity F1 — `department` | TBD | TBD | TBD | TBD | TBD |
-| Per-entity F1 — `product` | TBD | TBD | TBD | TBD | TBD |
-| p95 latency (ms) | TBD | TBD | TBD | TBD | TBD |
-| Cost per 1k queries (USD) | $0 | ~$5 | $0 | flat | infinite |
+| Intent accuracy | 0.533 | 0.867 | **0.911** | **+37.8 pp** | **+4.4 pp** |
+| Macro NER F1 | 0.300 | 0.337 | **0.394** | +9.4 pp | **+5.7 pp** |
+| p95 latency | 991 ms | 1699 ms | **467 ms** | **−524 ms** | **−1232 ms (3.6× faster)** |
+| Cost per 1k queries | $0 (local) | ~$5 (API) | $0 (local) | flat | infinite |
 
-## How to fill this
+### Per-intent accuracy
 
-1. **Pioneer side** — export the Pioneer eval reports for base GLiNER2 + GPT-4o into `baseline.json` and `gpt4o.json` in this folder. Copy the headline numbers into the table above.
-2. **Local side** — once you download the fine-tuned weights, run:
-   ```sh
-   GLINER2_MODEL_PATH=pioneer/weights/<model-name> \
-     uv run python -m pioneer.bench.run_local_eval --name finetuned
-   ```
-   Reads `finetuned.json` from `pioneer/bench/results/`. Copy headline numbers into the table.
+| Intent | Base GLiNER2 | GPT-4o | Fine-tuned v1 |
+|---|---|---|---|
+| lookup | 0.633 | 0.833 | **1.000** |
+| search | 0.000 | 0.857 | **1.000** |
+| analytical | 1.000 | 1.000 | **1.000** |
+| ambiguous | 0.250 | **1.000** | 0.000 ← only place GPT-4o wins |
+
+### Per-entity NER F1
+
+| Entity | Base GLiNER2 | GPT-4o | Fine-tuned v1 |
+|---|---|---|---|
+| emp_id | 0.982 | 0.982 | 0.947 |
+| product | 0.414 | 0.438 | **0.615** |
+| department | 0.182 | 0.353 | **0.400** |
+| customer_id | 0.222 | 0.250 | **0.400** (precision 0.25 — needs work) |
+| ticket_id | 0.000 | 0.000 | 0.000 ← no training signal anywhere |
+| date | 0.000 | 0.000 | 0.000 ← no training signal anywhere |
+| **MACRO** | 0.300 | 0.337 | **0.394** |
+
+Screenshots: `screenshots/01_intent_finetune_vs_baseline.png`,
+`02_ner_finetune_vs_baseline.png`, `03_finetune_vs_gpt4o.png`.
+
+## Acceptance targets
+
+| Target | Required | Round 1 | Status |
+|---|---|---|---|
+| Intent accuracy | ≥ 0.90 | 0.911 | ✅ |
+| Macro NER F1 | ≥ 0.85 | 0.394 | ❌ gap −0.456 |
+| Beat base on intent by ≥10pp | +10 | +37.8 | ✅ |
+| Beat base on NER by ≥10pp | +10 | +9.4 | ⚠️ just under |
+
+## Round 1 root causes
+
+1. **`ambiguous` intent: 0/4.** Seed had only 4 ambiguous examples; synth didn't generalize. Needs more diverse ambiguous training data.
+2. **`ticket_id` and `date` F1: 0.000.** Synth pass produced 515 examples with `entities=[]` — no new training signal for entity types beyond the seed (which had 2 ticket_id, 11 date). Need NER-aware synth or hand-crafted examples.
+3. **`customer_id` precision: 0.25.** Model over-fires on non-ID tokens. Needs negative examples (text mentioning "customer" without an id).
+
+## Side-challenge headline (Round 1 — already submission-grade)
+
+> A fine-tuned **205M-parameter GLiNER2 BEATS GPT-4o** on enterprise
+> knowledge-graph query routing — **91.1 %** vs **86.7 %** intent
+> accuracy, **0.394** vs **0.337** macro NER F1, and **3.6× lower p95
+> latency** (467 ms vs 1699 ms). $0 per query at inference (local CPU)
+> vs ~$5 / 1k queries on the GPT-4o API. Trained on 685 examples in
+> ~20 minutes on Pioneer.
+>
+> Round 2 targets the one place GPT-4o still wins (`ambiguous` intent,
+> 0/4 → target 4/4) and the two entity types with no training signal
+> anywhere (`ticket_id`, `date`) using Pioneer's `task_type='ner'`
+> generator instead of classification-only synth.
+
+## Round 2 plan
+
+Pioneer's `Generate Classification Data` task only emits {text, label};
+the synth answer is to use `task_type='ner'` for entity-rich rows then
+assign intent labels by rule (id present → lookup; agg keyword →
+analytical; etc.). Pioneer's agent confirmed this is the correct path.
+
+- 200+ NER-task synth examples focused on **ticket_id**, **date**,
+  **customer_id** spans (the entity types with F1=0 in Round 1).
+- 80+ new **ambiguous** examples (single nouns, vague phrases, no
+  entities). Fixes the only intent class fine-tune lost on.
+- 30+ hard-negative customer_id examples ("Customer Smith", "the
+  client", "vendor inquiries") to lift precision from 0.25.
+- Merge with the 685-row Round 1 train set, retrain (5 epochs, same
+  hyperparams). Re-eval against the same 45-row held-out set.
 
 ## Submission package (€700 side challenge)
 
-1. Pioneer fine-tune job link (paste here)
+1. Pioneer fine-tune job link — **`8767e329-dcbe-4162-89e6-f46a155882a1`** (Round 1; will update after Round 2)
 2. This `comparison.md` (filled in)
 3. `pioneer/README.md` — workflow + prompt + seed schema
 4. Integration code: `backend/retrieval/router.py:GLiNER2EntityRouter` (already shipped, env-gated)
-5. Live demo: `QONTEXT_ROUTER=gliner2 uv run uvicorn backend.api.app:app` then `POST /api/query` with a freeform NL question that the fine-tuned router should classify as `analytical` and route to AgenticTier
+5. Live demo: `QONTEXT_ROUTER=gliner2 uv run uvicorn backend.api.app:app` then `POST /api/query` with a freeform NL question that the fine-tuned router classifies as `analytical` and routes to AgenticTier

@@ -35,6 +35,15 @@ OUT_DIR = ROOT / "pioneer" / "seeds"
 
 PAT_EMP = re.compile(r"\bemp_\d+\b")
 PAT_CLNT = re.compile(r"\b(?:CLNT|CUST|VEND|ORG)-\d+\b")
+# Inline customer-id mention shortname after "customer_id" / "Customer ID" /
+# "customer ID" / "(customer_id: foo)". Catches the EnterpriseBench
+# convention where a 5-letter shortname (koene, ernsh, bolid, victe, linod,
+# blonp, merep, godos, commi, ...) follows the literal token. Stops at a
+# whitespace, comma, paren, brace, bracket, or end-of-string.
+PAT_CUST_INLINE = re.compile(
+    r"\bcustomer[ _]?id[\s:]+['\"]?([A-Za-z][A-Za-z0-9_]{2,15})['\"]?",
+    re.IGNORECASE,
+)
 PAT_ASIN = re.compile(r"\b[A-Z][0-9A-Z]{9}\b")
 PAT_TICKET_ID = re.compile(r"\bTicket\s+id\s+(\d+)\b", re.IGNORECASE)
 PAT_TICKET_DASH = re.compile(r"\bticket[-_:]\d+\b", re.IGNORECASE)
@@ -50,8 +59,15 @@ def extract(q: str) -> dict[str, list[str]]:
     if emps:
         ents["emp_id"] = emps[:6]
     cls = list(dict.fromkeys(PAT_CLNT.findall(q)))
-    if cls:
-        ents["customer_id"] = cls[:3]
+    inline = [m.group(1) for m in PAT_CUST_INLINE.finditer(q)]
+    # Filter out false positives: words like "the", "an", etc. and
+    # capture tokens after `customer_id` that are NOT one of the literal
+    # JSON-key noise words.
+    _NOISE = {"key", "value", "details", "name", "the", "an", "id"}
+    inline = [s for s in inline if s.lower() not in _NOISE]
+    customers = list(dict.fromkeys(cls + inline))
+    if customers:
+        ents["customer_id"] = customers[:3]
     asins = list(dict.fromkeys(PAT_ASIN.findall(q)))
     if asins:
         ents["product"] = asins[:3]
