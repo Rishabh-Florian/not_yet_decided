@@ -93,7 +93,7 @@ def _build_default_engine() -> ContextEngine:
 
 
 def _build_engine_with_store(store: GraphStore) -> ContextEngine:
-    """Cascade `[ExactTier, StubTier]` — the live `/api/query` engine."""
+    """Cascade `[ExactTier, HybridTier, StubTier]` — the live `/api/query` engine."""
     return ContextEngine(build_orchestrator_with_store(store))
 
 

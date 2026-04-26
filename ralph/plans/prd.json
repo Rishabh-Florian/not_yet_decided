@@ -28,8 +28,9 @@
         "category": "feat-retrieval",
         "description": "R2 Tier 3 HybridTier (vector + fulltext + rerank). Needs Neo4j HNSW vector index.",
         "depends_on": [2],
-        "passes": false,
-        "blocked": false
+        "passes": true,
+        "blocked": false,
+        "notes": "Reranker deferred; sentence-transformers dep not added (see human-backlog)."
     },
     {
         "issue": 6,

@@ -19,7 +19,7 @@
 > | REST API — Graph pattern query | **done** | `POST /api/graph/query` — typed pattern DSL |
 > | REST API — Edit API (human-in-the-loop) | **done** | `PUT /api/graph/node/{id}` — provenance-tracked edits |
 > | VFS API (ls, cat, grep, find, stat, tree) | not yet | VFS is a logical view (no disk materialization) — endpoints not built |
-> | Search API (semantic + hybrid, Neo4j HNSW) | not yet | Vector index architecture designed, endpoints not built |
+> | Search API (semantic + hybrid, Neo4j HNSW) | partial | R0/R1/R2 tiers landed (cascade + Cypher/fulltext + vector+RRF). Cross-encoder rerank still pending. Embedding population (`backend/retrieval/embed.py`) is a manual one-shot pass. |
 > | Conflict resolution engine + UI | not yet | Rule-based + LLM triage designed, not implemented |
 > | MCP server (for Claude / AI agents) | not yet | MCP tool wrappers over existing API |
 > | Web UI (React + Next.js) | not yet | No frontend code |
@@ -1197,7 +1197,7 @@ Each tier documents which algorithm it uses on its `Hit.score` and
 |---|---|---|---|
 | `stub` | LANDED (R0) | always returns 0 hits, relevance 0.0 | #2 |
 | `exact` | LANDED (R1) | Cypher exact id match + Neo4j fulltext (`node_text`, BM25-similar normalized to [0,1)) | #3 |
-| `hybrid` | pending (R2) | vector + fulltext + cross-encoder rerank | #4 |
+| `hybrid` | LANDED (R2) | Neo4j HNSW vector + fulltext (`node_text`) fused by Reciprocal Rank Fusion (k=60), normalized by max possible RRF | #4 |
 | `agentic` | pending (R3) | Gemini function-calling over store ops | #5 |
 
 **Pre-routing** (R4, issue #6 — Pioneer.ai GLiNER2): a router will

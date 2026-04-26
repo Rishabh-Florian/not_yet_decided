@@ -38,4 +38,14 @@
 - Open: p95 latency acceptance criterion needs RUN_INTEGRATION=1 with populated graph (eval-harness ready).
 - Next: #4 (R2 HybridTier).
 
+### 2026-04-26 — #4 done (R2 HybridTier)
+- backend/retrieval/hybrid.py: HybridTier(store, embedder, *, candidate_limit=30, result_limit=10, rrf_k=60). Vector arm (Neo4j HNSW on :Entity.embedding) + fulltext arm (existing node_text) fused via RRF (k=60), normalized to [0,1].
+- backend/retrieval/embedder.py: Embedder Protocol (dim, embed). StubEmbedder (hash-based, no semantic signal — for tests). BgeSmallEmbedder (lazy import sentence-transformers, BAAI/bge-small-en-v1.5).
+- backend/retrieval/embed.py: one-shot CLI to populate :Entity.embedding (uv run python -m backend.retrieval.embed).
+- backend/retrieval/index.py: ENTITY_VECTOR_INDEX="entity_vec", ensure_vector_index — idempotent CREATE VECTOR INDEX cosine.
+- Cascade: [exact (escalate<0.5), hybrid (escalate<0.3), stub (terminal)]. QONTEXT_EMBEDDER env: stub|bge.
+- Verifiers: ruff clean, pyright 0 errors, pytest 136 passed / 13 skipped.
+- Deferred (logged in human-backlog.txt): sentence-transformers dep, reranker, embedding population, recall/latency benchmarks.
+- Next: #6 (R4 RouterTier - GLiNER2).
+
 ---

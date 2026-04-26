@@ -9,3 +9,21 @@ While working on feature xyz (reference to prd.json entry), I could not proceed 
 or did not have the permissions to authenticate, do xyz.
 
 ---
+
+## 2026-04-26 — #4 HybridTier follow-ups (need human action)
+
+1. **Enable real embeddings (BGE-small)**
+   - Run: `uv add sentence-transformers` (~150MB model on first import)
+   - Set env: `QONTEXT_EMBEDDER=bge`
+   - One-shot index population: `uv run python -m backend.retrieval.embed`
+   - Without this, the vector arm returns 0 candidates and HybridTier degenerates to pure fulltext (functional but reduced recall).
+
+2. **Cross-encoder reranker (BGE-reranker-base)** — deferred
+   - Same `sentence-transformers` dep, additional ~120MB model.
+   - Insertion point already documented in `backend/retrieval/hybrid.py` module docstring (post-fusion transform, no public API change).
+   - File a follow-up issue when needed.
+
+3. **Recall/latency benchmarks for #4 acceptance**
+   - Requires Neo4j 5.x + EnterpriseBench data ingested + embeddings populated.
+   - Run: `RUN_INTEGRATION=1 uv run pytest -q backend/retrieval/tests/test_hybrid.py` then `uv run python -m backend.eval.harness --limit 100`.
+

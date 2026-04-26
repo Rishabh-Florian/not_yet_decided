@@ -6,8 +6,10 @@ live behind that wall (deep module).
 """
 from __future__ import annotations
 
+from .embedder import BgeSmallEmbedder, Embedder, StubEmbedder
 from .engine import ContextEngine
 from .exact import ExactTier
+from .hybrid import HybridTier
 from .models import Citation, Hit, QueryContext, QueryResult
 from .orchestrator import (
     CascadeOrchestrator,
@@ -18,13 +20,17 @@ from .orchestrator import (
 from .tiers import StubTier, Tier
 
 __all__ = [
+    "BgeSmallEmbedder",
     "CascadeOrchestrator",
     "Citation",
     "ContextEngine",
+    "Embedder",
     "ExactTier",
     "Hit",
+    "HybridTier",
     "QueryContext",
     "QueryResult",
+    "StubEmbedder",
     "StubTier",
     "Tier",
     "TierConfig",

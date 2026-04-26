@@ -153,37 +153,70 @@ def build_default_orchestrator(tiers: list[Tier]) -> CascadeOrchestrator:
 
 
 def build_orchestrator_with_store(store: object) -> CascadeOrchestrator:
-    """Production cascade for `POST /api/query`: `[ExactTier, StubTier]`.
+    """Production cascade for `POST /api/query`: `[ExactTier, HybridTier, StubTier]`.
 
     Tier order:
-      1. `exact`  — Cypher id lookup + Neo4j fulltext (R1, this issue)
-      2. `stub`   — terminal no-op so the cascade always returns a result
+      1. `exact`  — Cypher id lookup + Neo4j fulltext (R1, issue #3)
+      2. `hybrid` — vector + fulltext fused by RRF (R2, issue #4)
+      3. `stub`   — terminal no-op so the cascade always returns a result
 
     Escalation thresholds:
       * `exact.escalate_below = 0.5` — id-token hits (`relevance == 1.0`)
         terminate immediately; weak fulltext hits (normalized BM25 <
-        0.5) escalate to the stub. The 0.5 cutoff corresponds to a raw
-        Lucene score of 1.0 after `score / (1 + score)` normalization.
+        0.5) escalate to the hybrid tier. The 0.5 cutoff corresponds to
+        a raw Lucene score of 1.0 after `score / (1 + score)`
+        normalization.
+      * `hybrid.escalate_below = 0.3` — RRF scores are normalized so
+        rank-1-in-both-arms == 1.0; in practice realistic queries score
+        between 0.4 and 0.8 (single-arm hits land at ~0.5 max). 0.3 is
+        a permissive floor that escalates only when both arms missed
+        outright. Tune downward if recall is acceptable but escalation
+        is too aggressive.
       * `stub.escalate_below = 0.0` — terminal: never escalates past.
+
+    Embedder selection: defaults to `StubEmbedder` so the cascade boots
+    without any optional model dependency. Set `QONTEXT_EMBEDDER=bge`
+    in the environment to use `BgeSmallEmbedder` (`BAAI/bge-small-en-v1.5`,
+    requires `sentence-transformers`). Without the BGE backend the
+    hybrid tier is wired but its semantic recall is non-functional —
+    real embeddings need either the BGE local model or a remote API
+    key (e.g. GEMINI_API_KEY for a future Gemini-backed embedder).
+    The vector index population is a separate one-shot pass (run
+    `uv run python -m backend.retrieval.embed` once Neo4j has data).
 
     `store` is typed as `object` to dodge an import cycle
     (`backend.graph.store` imports `backend.models`). The runtime check
     enforces the real type.
     """
     # Local imports break the import cycle with backend.graph.store.
+    import os
+
     from backend.graph.store import GraphStore
 
+    from .embedder import BgeSmallEmbedder, Embedder, StubEmbedder
     from .exact import ExactTier
+    from .hybrid import HybridTier
     from .tiers import StubTier
 
     if not isinstance(store, GraphStore):
         raise TypeError(f"store must be GraphStore, got {type(store).__name__}")
+    embedder_kind = os.environ.get("QONTEXT_EMBEDDER", "stub").lower()
+    if embedder_kind == "bge":
+        embedder: Embedder = BgeSmallEmbedder()
+    elif embedder_kind == "stub":
+        embedder = StubEmbedder()
+    else:
+        raise ValueError(
+            f"QONTEXT_EMBEDDER must be 'bge' or 'stub', got {embedder_kind!r}"
+        )
     exact = ExactTier(store)
+    hybrid = HybridTier(store, embedder)
     stub = StubTier(name="stub")
     return CascadeOrchestrator(
-        tiers=[exact, stub],
+        tiers=[exact, hybrid, stub],
         configs=[
             TierConfig(name="exact", escalate_below=0.5),
+            TierConfig(name="hybrid", escalate_below=0.3),
             TierConfig(name="stub", escalate_below=0.0),
         ],
     )
