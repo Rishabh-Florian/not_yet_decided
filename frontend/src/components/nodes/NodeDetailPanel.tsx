@@ -65,8 +65,8 @@ export default function NodeDetailPanel({ id }: { id: string }) {
           {Object.entries(node.attributes).map(([key, val], idx, arr) => {
             const provForField = node.provenance.filter((p) => p.source_field?.includes(key));
             const method = provForField[0]?.extraction_method;
-            const dotColor = method === "human" ? "#7c3aed" : method === "llm_extraction" ? "#d97706"
-              : method === "direct_mapping" ? "#2563eb" : "#94a3b8";
+            const dotColor = method === "human" ? "#9d9d9d" : method === "llm_extraction" ? "#bdbdbd"
+              : method === "direct_mapping" ? "#e0e0e0" : "#727272";
             return (
               <button key={key} onClick={() => setProvenanceFocusField(key)}
                 className={`w-full flex items-start gap-3 px-3 py-2.5 hover:bg-bg-hover transition-colors text-left ${idx < arr.length - 1 ? "border-b border-border-color-subtle" : ""}`}>

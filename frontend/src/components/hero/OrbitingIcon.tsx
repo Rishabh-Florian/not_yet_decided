@@ -8,6 +8,7 @@ interface Props {
   theta: number;
   radius: number;
   speed: number;
+  yOffset?: number;
   label: string;
   svgDataUri: string;
   bgColor: string;
@@ -94,7 +95,7 @@ function makeIconTexture(
 }
 
 export default function OrbitingIcon({
-  phi, theta, radius, speed, label, svgDataUri, bgColor, labelColor = "#ffffff", drawLogo,
+  phi, theta, radius, speed, yOffset = 0, label, svgDataUri, bgColor, labelColor = "#ffffff", drawLogo,
 }: Props) {
   const spriteRef = useRef<THREE.Sprite>(null);
 
@@ -114,10 +115,10 @@ export default function OrbitingIcon({
     const azimuth = phi + t * speed;
     spriteRef.current.position.set(
       radius * Math.sin(theta) * Math.cos(azimuth),
-      radius * Math.cos(theta),
+      radius * Math.cos(theta) + yOffset,
       radius * Math.sin(theta) * Math.sin(azimuth),
     );
   });
 
-  return <sprite ref={spriteRef} material={material} scale={[0.54, 0.54, 0.54]} />;
+  return <sprite ref={spriteRef} material={material} scale={[0.47, 0.47, 0.47]} />;
 }

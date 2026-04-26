@@ -17,42 +17,50 @@ const INTEGRATIONS = [
   { label: "Jira",       speed: 0.54, phi: 5.50, theta: 2.10 },
 ];
 
-const RADIUS = 2.1;
+const RADIUS = 2.05;
+const ORBIT_Y_OFFSET = -0.2;
 
-export default function HeroScene() {
+type HeroSceneProps = {
+  minimal?: boolean;
+};
+
+export default function HeroScene({ minimal = false }: HeroSceneProps) {
   return (
     <Canvas
-      camera={{ position: [0, -0.4, 5.8], fov: 48 }}
+      camera={{ position: [0, -0.32, 5.35], fov: 45 }}
       className="w-full h-full"
       gl={{ antialias: true, alpha: true, outputColorSpace: "srgb" } as never}
     >
       <Suspense fallback={null}>
         <CompanyBrain />
-        {INTEGRATIONS.map((intg) => {
-          const brand = BRAND_LOGOS[intg.label];
-          return (
-            <group key={intg.label}>
-              <OrbitingIcon
-                phi={intg.phi}
-                theta={intg.theta}
+        {!minimal &&
+          INTEGRATIONS.map((intg) => {
+            const brand = BRAND_LOGOS[intg.label];
+            return (
+              <group key={intg.label}>
+                <OrbitingIcon
+                  phi={intg.phi}
+                  theta={intg.theta}
                 radius={RADIUS}
                 speed={intg.speed}
+                yOffset={ORBIT_Y_OFFSET}
                 label={intg.label}
                 svgDataUri={brand.svgDataUri}
                 bgColor={brand.bgColor}
-                labelColor={brand.labelColor}
-                drawLogo={brand.drawLogo}
-              />
-              <DataFlowLine
-                phi={intg.phi}
-                theta={intg.theta}
-                radius={RADIUS}
-                speed={intg.speed}
-                particleSpeed={intg.speed * 0.5}
-              />
-            </group>
-          );
-        })}
+                  labelColor={brand.labelColor}
+                  drawLogo={brand.drawLogo}
+                />
+                <DataFlowLine
+                  phi={intg.phi}
+                  theta={intg.theta}
+                  radius={RADIUS}
+                  speed={intg.speed}
+                  particleSpeed={intg.speed * 0.5}
+                  yOffset={ORBIT_Y_OFFSET}
+                />
+              </group>
+            );
+          })}
       </Suspense>
     </Canvas>
   );

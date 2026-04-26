@@ -6,10 +6,10 @@ import SourceRecordDrawer from "./SourceRecordDrawer";
 import { ArrowRight, Cpu, User, Wand2, type LucideIcon } from "lucide-react";
 
 const METHOD_META: Record<string, { label: string; color: string; Icon: LucideIcon }> = {
-  direct_mapping: { label: "Direct",  color: "#2563eb", Icon: ArrowRight },
-  llm_extraction: { label: "LLM",     color: "#d97706", Icon: Cpu       },
-  rule_based:     { label: "Rule",    color: "#059669", Icon: Wand2     },
-  human:          { label: "Human",   color: "#7c3aed", Icon: User      },
+  direct_mapping: { label: "Direct",  color: "#e6e6e6", Icon: ArrowRight },
+  llm_extraction: { label: "LLM",     color: "#c2c2c2", Icon: Cpu       },
+  rule_based:     { label: "Rule",    color: "#aaaaaa", Icon: Wand2     },
+  human:          { label: "Human",   color: "#969696", Icon: User      },
 };
 
 export default function ProvenanceTimeline({ provenance }: { provenance: ProvenanceResponse[] }) {
@@ -58,7 +58,7 @@ export default function ProvenanceTimeline({ provenance }: { provenance: Provena
                   </p>
                 </button>
                 {p.extraction_method === "human" && p.extraction_model && (
-                  <p className="text-xs font-mono" style={{ color: "#7c3aed" }}>{p.extraction_model}</p>
+                  <p className="text-xs font-mono text-zinc-400">{p.extraction_model}</p>
                 )}
               </div>
             </div>

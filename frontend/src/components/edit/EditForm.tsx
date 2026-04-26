@@ -59,7 +59,7 @@ export default function EditForm({ nodeId }: { nodeId: string }) {
             <div key={key} className="space-y-1">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-mono text-text-secondary">{key}</label>
-                {isEdited && <span className="text-xs font-medium" style={{ color: "#7c3aed" }}>edited</span>}
+                {isEdited && <span className="text-xs font-medium text-zinc-300">edited</span>}
               </div>
               {String(val).length > 80 ? (
                 <Textarea value={currentVal}
@@ -90,7 +90,7 @@ export default function EditForm({ nodeId }: { nodeId: string }) {
         </div>
 
         {saved && (
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-50 text-green-700 text-sm border border-green-200">
+          <div className="flex items-center gap-2 rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-zinc-200">
             <CheckCircle size={14} />
             Changes saved with provenance tracking.
           </div>
@@ -98,7 +98,7 @@ export default function EditForm({ nodeId }: { nodeId: string }) {
 
         <Button onClick={handleSave}
           disabled={isPending || !editor.trim() || Object.keys(edits).length === 0}
-          className="w-full bg-accent hover:bg-accent-dim text-white gap-2">
+          className="w-full gap-2 border border-white/20 bg-white text-black hover:bg-zinc-200">
           <Save size={14} />
           {isPending ? "Saving…" : "Save changes"}
         </Button>

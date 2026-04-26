@@ -6,13 +6,13 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export const NODE_TYPE_COLORS: Record<string, string> = {
-  Person:       "#3b82f6",
-  Organization: "#8b5cf6",
-  Document:     "#f59e0b",
-  Message:      "#06b6d4",
-  Event:        "#ec4899",
-  Asset:        "#10b981",
-  Topic:        "#f97316",
+  Person:       "#f2f2f2",
+  Organization: "#dfdfdf",
+  Document:     "#cccccc",
+  Message:      "#b7b7b7",
+  Event:        "#a9a9a9",
+  Asset:        "#989898",
+  Topic:        "#878787",
 };
 
 export const NODE_TYPES = ["Person", "Organization", "Document", "Message", "Event", "Asset", "Topic"] as const;
@@ -33,7 +33,7 @@ export const NODE_TYPE_VFS: Record<string, string> = {
 };
 
 export function nodeTypeColor(type: string): string {
-  return NODE_TYPE_COLORS[type] ?? "#64748b";
+  return NODE_TYPE_COLORS[type] ?? "#7b7b7b";
 }
 
 export function formatConfidence(c: number): string {
@@ -41,13 +41,12 @@ export function formatConfidence(c: number): string {
 }
 
 export function confidenceColor(c: number): string {
-  if (c >= 0.85) return "#16a34a";
-  if (c >= 0.60) return "#d97706";
-  return "#dc2626";
+  if (c >= 0.85) return "#f1f1f1";
+  if (c >= 0.60) return "#bdbdbd";
+  return "#7d7d7d";
 }
 
 export function nodeDisplayName(node: { id: string; attributes: Record<string, unknown> }): string {
   const a = node.attributes;
   return String(a.name ?? a.subject ?? a.title ?? a.email ?? node.id);
 }
-

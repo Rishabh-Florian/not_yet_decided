@@ -10,50 +10,50 @@ const config: Config = {
     extend: {
       colors: {
         // Backgrounds
-        bg:            "#f8f9fa",
-        "bg-card":     "#ffffff",
-        "bg-hover":    "#f1f5f9",
-        "bg-active":   "#eff6ff",
+        bg:            "#080808",
+        "bg-card":     "#111111",
+        "bg-hover":    "#181818",
+        "bg-active":   "#202020",
 
         // Borders
-        "border-color":        "#e2e8f0",
-        "border-color-subtle": "#f1f5f9",
+        "border-color":        "#2a2a2a",
+        "border-color-subtle": "#1c1c1c",
 
         // Text
-        "text-primary":   "#0f172a",
-        "text-secondary": "#64748b",
-        "text-tertiary":  "#94a3b8",
-        "text-mono":      "#475569",
+        "text-primary":   "#f3f3f3",
+        "text-secondary": "#b4b4b4",
+        "text-tertiary":  "#7c7c7c",
+        "text-mono":      "#9a9a9a",
 
-        // Accent (blue)
-        accent:       "#2563eb",
-        "accent-dim": "#1d4ed8",
-        "accent-bg":  "#eff6ff",
+        // Accent (monochrome)
+        accent:       "#e5e5e5",
+        "accent-dim": "#cfcfcf",
+        "accent-bg":  "#1b1b1b",
 
         // Node type colors
         node: {
-          person:       "#2563eb",
-          organization: "#7c3aed",
-          document:     "#d97706",
-          message:      "#0891b2",
-          event:        "#db2777",
-          asset:        "#059669",
-          topic:        "#ea580c",
+          person:       "#f0f0f0",
+          organization: "#dadada",
+          document:     "#c8c8c8",
+          message:      "#b5b5b5",
+          event:        "#a8a8a8",
+          asset:        "#989898",
+          topic:        "#888888",
         },
 
         // Confidence
-        "conf-high": "#16a34a",
-        "conf-mid":  "#d97706",
-        "conf-low":  "#dc2626",
+        "conf-high": "#f0f0f0",
+        "conf-mid":  "#b8b8b8",
+        "conf-low":  "#7f7f7f",
 
         // Human provenance
-        "human-prov": "#7c3aed",
+        "human-prov": "#d5d5d5",
 
         // Legacy dark tokens (hero page still uses these)
-        background:       "#0d1117",
-        surface:          "#161b22",
-        "surface-raised": "#21262d",
-        border:           "#30363d",
+        background:       "#090909",
+        surface:          "#121212",
+        "surface-raised": "#1a1a1a",
+        border:           "#2a2a2a",
       },
       fontFamily: {
         sans: ["var(--font-geist-sans)", "system-ui", "sans-serif"],

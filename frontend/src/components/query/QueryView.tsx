@@ -22,7 +22,7 @@ function tokenize(pattern: string) {
       const type = part.slice(1, -1);
       const color = NODE_TYPES.includes(type as typeof NODE_TYPES[number])
         ? nodeTypeColor(type)
-        : "#64748b";
+        : "#8a8a8a";
       return <span key={i} style={{ color }} className="font-medium">{part}</span>;
     }
     if (part.startsWith("[")) return <span key={i} className="text-accent font-medium">{part}</span>;

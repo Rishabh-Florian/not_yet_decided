@@ -136,7 +136,7 @@ export default function GraphView() {
         const label = n.name.length > 16 ? n.name.slice(0, 15) + "…" : n.name;
         const fontSize = Math.max(8, 10 / globalScale);
         ctx.font = `${fontSize}px system-ui`;
-        ctx.fillStyle = "#374151";
+        ctx.fillStyle = "#bcbcbc";
         ctx.textAlign = "center";
         ctx.textBaseline = "top";
         ctx.fillText(label, n.x, n.y + r + 2);
@@ -172,20 +172,20 @@ export default function GraphView() {
       <ForceGraph2D
         ref={graphRef as never}
         graphData={graphData}
-        backgroundColor="#f8f9fa"
+        backgroundColor="#080808"
         nodeColor={(n) => (n as GNode).color}
         nodeVal={(n) => (n as GNode).val}
         nodeLabel={(n) => {
           const node = n as GNode;
           return `${node.type}: ${node.name}`;
         }}
-        linkColor={() => "#cbd5e1"}
+        linkColor={() => "#3f3f3f"}
         linkWidth={0.6}
         linkDirectionalArrowLength={2.5}
         linkDirectionalArrowRelPos={1}
         linkDirectionalParticles={2}
         linkDirectionalParticleWidth={1.2}
-        linkDirectionalParticleColor={() => "#94a3b8"}
+        linkDirectionalParticleColor={() => "#a0a0a0"}
         onNodeClick={handleNodeClick}
         onNodeHover={(node) => setHoveredId(node ? (node as GNode).id : null)}
         nodeCanvasObject={paintNode}
@@ -197,7 +197,7 @@ export default function GraphView() {
       />
 
       {/* Legend */}
-      <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm rounded-xl border border-border-color p-2.5 shadow-sm space-y-1">
+      <div className="absolute top-3 left-3 rounded-xl border border-border-color bg-black/75 p-2.5 shadow-sm backdrop-blur-sm space-y-1">
         {NODE_TYPE_LABELS.map(({ type, color }) => (
           <span key={type} className="flex items-center gap-1.5 text-xs text-text-secondary">
             <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
@@ -207,7 +207,7 @@ export default function GraphView() {
       </div>
 
       {/* Stats overlay */}
-      <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm rounded-lg border border-border-color px-2.5 py-1.5 text-xs text-text-tertiary font-mono shadow-sm">
+      <div className="absolute top-3 right-3 rounded-lg border border-border-color bg-black/75 px-2.5 py-1.5 text-xs text-text-tertiary font-mono shadow-sm backdrop-blur-sm">
         {graphData.nodes.filter((n) => n.type === "Person").length} people ·{" "}
         {graphData.nodes.filter((n) => n.type === "Message").length} messages ·{" "}
         {graphData.links.length} edges
@@ -217,7 +217,7 @@ export default function GraphView() {
       <div className="absolute bottom-3 right-3">
         <button
           onClick={() => graphRef.current?.zoomToFit?.(400)}
-          className="px-3 py-1.5 text-xs bg-white border border-border-color text-text-secondary rounded-lg shadow-sm hover:text-accent hover:border-accent/30 transition-colors"
+          className="rounded-lg border border-border-color bg-black/80 px-3 py-1.5 text-xs text-text-secondary shadow-sm transition-colors hover:border-accent/30 hover:text-accent"
         >
           Reset zoom
         </button>

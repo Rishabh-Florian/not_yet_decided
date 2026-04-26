@@ -9,6 +9,7 @@ interface Props {
   radius: number;
   speed: number;
   particleSpeed: number;
+  yOffset?: number;
 }
 
 function bezierPoint(t: number, p0: THREE.Vector3, p1: THREE.Vector3, p2: THREE.Vector3, p3: THREE.Vector3) {
@@ -20,7 +21,7 @@ function bezierPoint(t: number, p0: THREE.Vector3, p1: THREE.Vector3, p2: THREE.
   );
 }
 
-export default function DataFlowLine({ phi, theta, radius, speed, particleSpeed }: Props) {
+export default function DataFlowLine({ phi, theta, radius, speed, particleSpeed, yOffset = 0 }: Props) {
   const { scene } = useThree();
   const lineRef = useRef<THREE.Line | null>(null);
   const particleRef = useRef<THREE.Mesh>(null);
@@ -29,7 +30,7 @@ export default function DataFlowLine({ phi, theta, radius, speed, particleSpeed 
   useEffect(() => {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(20 * 3), 3));
-    const mat = new THREE.LineBasicMaterial({ color: "#7dd3fc", transparent: true, opacity: 0.18 });
+    const mat = new THREE.LineBasicMaterial({ color: "#8ea0b4", transparent: true, opacity: 0.2 });
     const line = new THREE.Line(geo, mat);
     scene.add(line);
     lineRef.current = line;
@@ -45,7 +46,7 @@ export default function DataFlowLine({ phi, theta, radius, speed, particleSpeed 
     const azimuth = phi + t * speed;
     const iconPos = new THREE.Vector3(
       radius * Math.sin(theta) * Math.cos(azimuth),
-      radius * Math.cos(theta),
+      radius * Math.cos(theta) + yOffset,
       radius * Math.sin(theta) * Math.sin(azimuth),
     );
     const mid = iconPos.clone().lerp(origin, 0.5).add(new THREE.Vector3(0, 0.4, 0));
@@ -72,9 +73,9 @@ export default function DataFlowLine({ phi, theta, radius, speed, particleSpeed 
   });
 
   return (
-    <mesh ref={particleRef}>
+      <mesh ref={particleRef}>
       <sphereGeometry args={[0.028, 6, 6]} />
-      <meshBasicMaterial color="#bae6fd" transparent opacity={0.9} />
+      <meshBasicMaterial color="#dbeafe" transparent opacity={0.88} />
     </mesh>
   );
 }
