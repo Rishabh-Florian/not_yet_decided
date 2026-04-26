@@ -1256,15 +1256,17 @@ cascade up-front.
   source_field)` so the score reflects unique evidence, not call
   count.
 
-**Workflow API (frozen-policy retrieval)** -- LANDED (R5a + R5b)
+**Workflow API (frozen-policy retrieval)** -- LANDED (R5a + R5b + R5c)
 
 Cascade is the right default for ad-hoc queries. Some flows have a
 known shape — the answer-customer-email flow always wants
-customer + tickets/sales + product context, never agentic
-reasoning. Hard-coding the recipe per workflow cuts latency and cost
+customer + tickets/sales + product context; the thread-summary flow
+always wants T3 cluster recall plus a tightly-bounded T4 traversal.
+Hard-coding the recipe per workflow cuts latency and cost
 predictably (no escalation logic, no router pre-pass) and lets the
-LLM do only what it's good at: drafting natural language from a
-deterministic brief.
+LLM do only what it's good at: drafting natural language (deterministic
+workflows) or making bounded retrieval decisions (less-deterministic
+workflows) over a frozen tier subset.
 
 ```
 GET  /api/workflow                                      # discovery: registered workflow names
@@ -1286,7 +1288,7 @@ factory the API endpoint uses.
 | Workflow | Status | Tiers used | Issue |
 |---|---|---|---|
 | `answer-customer-email` | LANDED (R5b) | `exact` (sender lookup + neighbor traversal) + `hybrid` (product semantic search) + LLM compose (single-shot, `tools=[]`) | #8 |
-| `thread-summary` | pending | TBD | #9 |
+| `thread-summary` | LANDED (R5c) | `hybrid` (T3 starting cluster from participants + regex-NER id tokens) + bounded LLM agent loop (3-tool subset: `get_node` / `get_neighbors` / `get_source_record`, ≤ 6 tool calls) | #9 |
 
 **`answer-customer-email` recipe** (`backend/retrieval/workflows/customer_email.py`):
 
@@ -1321,6 +1323,65 @@ product_candidate_count}` for diagnostics. Citations are accumulated
 across steps 1–3 and deduplicated on
 `(source_file, source_record_id, source_field)` so the UI sees one
 row per piece of evidence.
+
+**`thread-summary` recipe** (`backend/retrieval/workflows/thread_summary.py`):
+
+Less-deterministic counterpart to `answer-customer-email`. Conversation
+threads (Slack, meeting transcripts, email threads) are unstructured —
+variable participants, implicit context, off-topic detours — so the
+recipe pairs deterministic recall with a bounded LLM-driven traversal.
+
+Input shape: `{kind: "meeting"|"slack"|"email_thread", participants:
+list[str], messages: list[{author, ts, text}]}`. Empty `messages` →
+`relevance=0.0`, no LLM call (issue acceptance criterion).
+
+1. **T3 / HybridTier (deterministic recall).** RRF over (a) every
+   participant string verbatim and (b) every id token (`emp_NNNN` /
+   `cust_NNNN` / `prod_NNNN` / ...) extracted from the message text by
+   a light regex NER. Top 5 hits per query are aggregated; duplicate
+   node ids are deduped (best score wins). The result is the "starting
+   cluster" of related entity nodes the agent loop can traverse from.
+   Topic-phrase NER beyond raw id tokens is deferred until R4
+   (GLiNER2) lands, per the issue's implementation note.
+2. **Bounded LLM agent loop (less-deterministic).** Same `LLMClient`
+   protocol the AgenticTier uses, but with a **narrower 3-tool surface**
+   surfaced to the model:
+   * `get_node(node_id)`
+   * `get_neighbors(node_id, relation_type=None, depth=1)`
+   * `get_source_record(source_file, record_id)`
+
+   `pattern_query` / `fulltext_search` / `vector_search` are
+   intentionally out of scope: the cluster from step 1 is the recall;
+   the agent's job is to traverse, not to re-search. **Tool budget = 6**
+   — overshoot returns the last partial summary text with
+   `relevance=0.0` and `extras.reason="tool_budget_exceeded"` (no
+   crash). Tool exceptions are forwarded to the model as the next
+   turn's tool result so the model can self-correct (mirrors
+   `AgenticTier`).
+3. **LLM compose (final turn).** When the model emits text instead of
+   another tool call, the loop exits. The text is the structured
+   summary markdown (gist / decisions-and-action-items / open
+   questions / linked entities). Each action item and linked entity
+   carries a `[node:<id>]` citation; the model is instructed to cite
+   only ids surfaced by the cluster or a tool response.
+
+`allowed_tiers = frozenset({"hybrid"})` — `exact` is excluded ("Skip
+T1 entirely — id matches are rare in conversational text") and
+`agentic` is not declared because the workflow drives its own
+LLM loop directly rather than going through the cascade's
+`AgenticTier` (so the loop can expose a custom 3-tool surface
+instead of `AgenticTier`'s standard 6).
+
+Algorithmic relevance (mirrors `AgenticTier.RELEVANCE_*`):
+
+* `0.7` — non-empty summary AND ≥ 1 unique citation harvested.
+* `0.3` — non-empty summary, zero citations.
+* `0.0` — empty thread, tool-budget overshoot, or any LLM exception.
+
+`extras = {kind, tool_calls_used, action_items, linked_entity_ids}`.
+`action_items` is parsed from the `## Decisions / Action items` section
+of the summary (regex over bullet lines); `linked_entity_ids` is the
+order-preserving dedup of `[node:<id>]` markers across the answer.
 
 **Eval harness** (`backend/eval/`):
 

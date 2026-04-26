@@ -91,4 +91,19 @@
 - Backlog: API endpoint extras wiring, SAME_AS-cluster identity, p95 benchmark, URL-slug doc fix.
 - Next: #9 (R5c thread-summary).
 
+### 2026-04-26 — #9 done (R5c thread-summary — less-deterministic workflow)
+- backend/retrieval/workflows/thread_summary.py: ThreadSummaryWorkflow.
+- name: "thread-summary"; allowed_tiers: frozenset({"hybrid"}) — exact excluded (id matches rare in conversational text); agentic NOT declared (workflow runs its own narrower 3-tool dispatcher).
+- Tool surface: get_node, get_neighbors, get_source_record (excludes pattern_query/fulltext_search/vector_search since T3 already did recall).
+- Iteration cap: _MAX_TOOL_CALLS=6. Overshoot → relevance=0.0, extras.reason="tool_budget_exceeded".
+- LLM "less-deterministic" knob: chooses which cluster nodes to expand, which records to pull, when to stop. Tier set + initial recall queries are deterministic; traversal depth/breadth is model-driven within budget.
+- IO: ThreadSummaryInput(kind: meeting|slack|email_thread, participants, messages); WorkflowResult.answer = structured markdown; extras = {kind, tool_calls_used, action_items, linked_entity_ids, [reason]}.
+- Citations dedup'd via single CitationCollector across T3 hits + every tool call.
+- Algorithmic relevance: 0.7 grounded / 0.3 ungrounded / 0.0 failed (mirrors AgenticTier).
+- Light NER via regex (emp|cust|customer|prod|product|ticket|order|sale)_<id>; GLiNER2 swap deferred until #6 fine-tune lands.
+- Verifiers: ruff clean, pyright 0 errors, pytest 301 passed / 16 skipped.
+
+## ALL 9 ISSUES DONE
+Sequence: #10, #2, #3, #4, #6, #5, #7, #8, #9. Branch: feature/ralph-batch.
+
 ---

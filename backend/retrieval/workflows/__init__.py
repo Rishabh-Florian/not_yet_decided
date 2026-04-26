@@ -13,7 +13,8 @@ Concrete workflows:
 
 * `CustomerEmailWorkflow` (issue #8) — `answer-customer-email`,
   T1 sender lookup → T1 neighbors → T3 product search → LLM compose.
-* `thread-summary` (issue #9) — pending.
+* `ThreadSummaryWorkflow` (issue #9) — `thread-summary`, T3 cluster
+  recall → bounded T4 agent loop (3-tool surface) → structured summary.
 
 Importing this package registers every shipped workflow as a
 side effect (the `register_workflow` decorator runs at import time).
@@ -29,10 +30,18 @@ from .registry import (
     list_workflows,
     register_workflow,
 )
+from .thread_summary import (
+    ThreadMessage,
+    ThreadSummaryInput,
+    ThreadSummaryWorkflow,
+)
 
 __all__ = [
     "CustomerEmailInput",
     "CustomerEmailWorkflow",
+    "ThreadMessage",
+    "ThreadSummaryInput",
+    "ThreadSummaryWorkflow",
     "TierRegistry",
     "Workflow",
     "WorkflowInput",

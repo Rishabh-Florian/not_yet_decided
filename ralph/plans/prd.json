@@ -71,7 +71,7 @@
         "category": "feat-retrieval",
         "description": "R5c Less-deterministic workflow: thread-summary",
         "depends_on": [7],
-        "passes": false,
+        "passes": true,
         "blocked": false
     }
 ]
