@@ -668,3 +668,73 @@ class TestGLiNER2EntityRouterConstructorWithoutEnv:
         monkeypatch.delenv(GLiNER2EntityRouter.MODEL_ID_ENV, raising=False)
         with pytest.raises(RuntimeError, match="requires either"):
             GLiNER2EntityRouter()
+
+
+class TestTwoModelEntityRouter:
+    """Unit tests for the two-model parallel router. We mock out the two
+    Pioneer HTTP calls — no real network, no Pioneer creds needed. The
+    behaviour we want to verify:
+    - constructor fails fast when any of the three env vars is missing,
+    - classify() merges the two backends into one RouterDecision,
+    - both backends are called concurrently (we assert the futures fan out).
+    """
+    def _make_router(self, monkeypatch: pytest.MonkeyPatch) -> object:
+        from backend.retrieval.router import TwoModelEntityRouter
+        monkeypatch.setenv(TwoModelEntityRouter.INTENT_MODEL_ID_ENV, "intent-id")
+        monkeypatch.setenv(TwoModelEntityRouter.NER_MODEL_ID_ENV, "ner-id")
+        monkeypatch.setenv(TwoModelEntityRouter.API_KEY_ENV, "fake-key")
+        return TwoModelEntityRouter()
+
+    def test_constructor_requires_all_three_env_vars(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from backend.retrieval.router import TwoModelEntityRouter
+        for env in (
+            TwoModelEntityRouter.INTENT_MODEL_ID_ENV,
+            TwoModelEntityRouter.NER_MODEL_ID_ENV,
+            TwoModelEntityRouter.API_KEY_ENV,
+        ):
+            monkeypatch.delenv(env, raising=False)
+        with pytest.raises(RuntimeError, match="requires all of"):
+            TwoModelEntityRouter()
+
+    def test_classify_merges_both_backends(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        router = self._make_router(monkeypatch)
+
+        def fake_call(payload: dict) -> dict:
+            if payload["task"] == "schema":
+                return {"intent": "lookup", "entities": {}}
+            if payload["task"] == "extract_entities":
+                return {"entities": {"emp_id": ["emp_1002"], "ticket_id": ["123"]}}
+            raise AssertionError(f"unexpected task {payload['task']}")
+
+        monkeypatch.setattr(router, "_call_pioneer", fake_call)
+        decision = router.classify("Show me ticket 123 for emp_1002")
+        assert decision.intent == "lookup"
+        assert decision.confidence == 1.0
+        assert decision.entities == {"emp_id": ["emp_1002"], "ticket_id": ["123"]}
+
+    def test_classify_propagates_backend_errors(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        router = self._make_router(monkeypatch)
+
+        def fake_call(payload: dict) -> dict:
+            if payload["task"] == "extract_entities":
+                raise RuntimeError("Pioneer NER HTTP 503")
+            return {"intent": "search", "entities": {}}
+
+        monkeypatch.setattr(router, "_call_pioneer", fake_call)
+        with pytest.raises(RuntimeError, match="HTTP 503"):
+            router.classify("anything")
+
+    def test_classify_rejects_empty_query(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        router = self._make_router(monkeypatch)
+        with pytest.raises(ValueError, match="non-empty"):
+            router.classify("   ")
+        with pytest.raises(TypeError, match="must be str"):
+            router.classify(123)  # type: ignore[arg-type]

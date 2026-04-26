@@ -324,6 +324,7 @@ class GLiNER2EntityRouter:
     def _ensure_local_model(self) -> object:
         if self._model is None:
             from gliner import GLiNER  # type: ignore[import-not-found]
+            assert self._model_path is not None  # __init__ guarantees one of path/endpoint
             self._model = GLiNER.from_pretrained(self._model_path)
         return self._model
 
@@ -464,6 +465,168 @@ def _parse_gliner2_output(raw: object) -> RouterDecision:
             continue
         spans.setdefault(label, []).append(text)
     return RouterDecision(intent=intent, confidence=confidence, entities=spans)
+
+
+class TwoModelEntityRouter:
+    """Splits intent classification and NER across two specialized Pioneer
+    models, called in parallel on a 2-thread pool.
+
+    Why two models: the v2 schema fine-tune nailed intent (0.978 acc) but
+    its NER head was diluted to 0.430 macro F1 by the joint training. The
+    v3 NER-only fine-tune hit 0.851 macro F1 in isolation. Running both
+    in parallel keeps the API call budget at one round-trip
+    (max(intent_latency, ner_latency)) while preserving each head's
+    isolated accuracy.
+
+    Backends are HTTP calls to Pioneer's `/v1/chat/completions` endpoint.
+    Both calls go to the same host with the same auth, just different
+    `model` ids and `task` types (`schema` for intent, `extract_entities`
+    for NER). The class falls back to the runtime-determined intent
+    confidence threshold (default 0.5) so an under-confident classifier
+    flips the result to `ambiguous` upstream — same calibration story as
+    `GLiNER2EntityRouter`.
+    """
+
+    INTENT_MODEL_ID_ENV: str = "PIONEER_INTENT_MODEL_ID"
+    NER_MODEL_ID_ENV: str = "PIONEER_NER_MODEL_ID"
+    API_KEY_ENV: str = "PIONEER_API_KEY"
+    API_BASE_ENV: str = "PIONEER_API_BASE"
+    DEFAULT_API_BASE: str = "https://api.pioneer.ai/v1"
+
+    def __init__(
+        self,
+        *,
+        intent_model_id: str | None = None,
+        ner_model_id: str | None = None,
+        pioneer_api_key: str | None = None,
+        intent_threshold: float = 0.95,
+        ner_threshold: float = 0.99,
+        request_timeout_s: float = 30.0,
+    ) -> None:
+        intent_id = intent_model_id or os.environ.get(self.INTENT_MODEL_ID_ENV)
+        ner_id = ner_model_id or os.environ.get(self.NER_MODEL_ID_ENV)
+        api_key = pioneer_api_key or os.environ.get(self.API_KEY_ENV)
+        missing = [
+            name
+            for name, val in [
+                (self.INTENT_MODEL_ID_ENV, intent_id),
+                (self.NER_MODEL_ID_ENV, ner_id),
+                (self.API_KEY_ENV, api_key),
+            ]
+            if not val
+        ]
+        if missing:
+            raise RuntimeError(
+                "TwoModelEntityRouter requires all of: "
+                f"{', '.join(missing)}. See pioneer/MODELS.md for model ids."
+            )
+        # mypy/pyright: missing-check above narrows to str but the assigner
+        # doesn't infer that — assert for pyright + runtime safety.
+        assert intent_id and ner_id and api_key
+        self._intent_model_id: str = intent_id
+        self._ner_model_id: str = ner_id
+        self._api_key: str = api_key
+        self._api_base = os.environ.get(self.API_BASE_ENV, self.DEFAULT_API_BASE)
+        self._intent_threshold = intent_threshold
+        self._ner_threshold = ner_threshold
+        self._request_timeout_s = request_timeout_s
+        self._http_client: object | None = None
+        self._pool: object | None = None
+
+    def _ensure_http(self) -> object:
+        if self._http_client is None:
+            import httpx
+
+            self._http_client = httpx.Client(timeout=self._request_timeout_s)
+        return self._http_client
+
+    def _ensure_pool(self) -> object:
+        if self._pool is None:
+            from concurrent.futures import ThreadPoolExecutor
+
+            self._pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="entity-router")
+        return self._pool
+
+    def _call_pioneer(self, payload: dict[str, object]) -> dict[str, object]:
+        client = self._ensure_http()
+        url = f"{self._api_base}/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+        }
+        resp = client.post(url, json=payload, headers=headers)  # type: ignore[attr-defined]
+        if resp.status_code != 200:
+            raise RuntimeError(
+                f"Pioneer inference HTTP {resp.status_code}: {resp.text[:200]}"
+            )
+        body = resp.json()
+        # Pioneer wraps the prediction either at top level or under `result`.
+        return body.get("result", body) if isinstance(body, dict) else body  # type: ignore[no-any-return]
+
+    def _classify_intent(self, query: str) -> tuple[RouterIntent, float]:
+        """Call Pioneer hosted intent model. v2 schema returns
+        ``{"intent": "<label>", "entities": {...}}`` — we keep only the
+        intent and discard its NER (v3 below produces better NER)."""
+        raw = self._call_pioneer({
+            "model": self._intent_model_id,
+            "task": "schema",
+            "input": query,
+            "schema": {
+                "entities": list(ENTITY_TYPES),
+                "classifications": {"intent": list(INTENTS)},
+            },
+            "threshold": self._intent_threshold,
+        })
+        intent = raw.get("intent")
+        if intent not in INTENTS:
+            raise RuntimeError(
+                f"Intent model returned unknown intent {intent!r}; "
+                f"expected one of {INTENTS}"
+            )
+        # Hosted API has already applied threshold; treat as fully confident.
+        return intent, 1.0  # type: ignore[return-value]
+
+    def _extract_entities(self, query: str) -> dict[str, list[str]]:
+        """Call Pioneer hosted NER model. v3 NER-only returns
+        ``{"entities": {"<type>": [<spans>], ...}}``."""
+        raw = self._call_pioneer({
+            "model": self._ner_model_id,
+            "task": "extract_entities",
+            "input": query,
+            "schema": list(ENTITY_TYPES),
+            "threshold": self._ner_threshold,
+        })
+        entities_raw = raw.get("entities", raw)
+        if not isinstance(entities_raw, dict):
+            raise RuntimeError(
+                f"NER model returned non-dict entities: {type(entities_raw).__name__}"
+            )
+        spans: dict[str, list[str]] = {}
+        for etype, vals in entities_raw.items():
+            if etype not in ENTITY_TYPES:
+                continue
+            if not isinstance(vals, list):
+                raise RuntimeError(f"NER entities[{etype!r}] must be a list")
+            clean = [v for v in vals if isinstance(v, str) and v]
+            if clean:
+                spans[etype] = clean
+        return spans
+
+    def classify(self, query: str) -> RouterDecision:
+        if not isinstance(query, str):
+            raise TypeError(f"query must be str, got {type(query).__name__}")
+        if not query.strip():
+            raise ValueError("query must be non-empty / non-whitespace")
+        pool = self._ensure_pool()
+        # Fan out — intent + NER in parallel. Each backend raises on its own
+        # bugs (HTTP error, malformed shape); .result() re-raises to the
+        # caller, which is what we want (fail fast — no silent degradation
+        # to a half-decision).
+        intent_fut = pool.submit(self._classify_intent, query)  # type: ignore[attr-defined]
+        ner_fut = pool.submit(self._extract_entities, query)  # type: ignore[attr-defined]
+        intent, confidence = intent_fut.result()
+        entities = ner_fut.result()
+        return RouterDecision(intent=intent, confidence=confidence, entities=entities)
 
 
 class RouterTier(Tier):

@@ -260,14 +260,15 @@ def build_orchestrator_with_store(store: object) -> CascadeOrchestrator:
     The vector index population is a separate one-shot pass (run
     `uv run python -m backend.retrieval.embed` once Neo4j has data).
 
-    Router backend selection: defaults to `StubEntityRouter` (regex
-    fallback, deterministic, no model). Set `BETTER_CONTEXT_ROUTER=gliner2`
-    AND one of `GLINER2_MODEL_PATH` (local weights) or
-    `PIONEER_AI_MODEL_ID` to use the fine-tuned GLiNER2 backend.
-    Without those, the stub fallback keeps the cascade green but does
-    NOT produce real NER spans — see
-    `pioneer/README.md` for the Pioneer.ai
-    fine-tune workflow.
+    Router backend selection (`BETTER_CONTEXT_ROUTER`):
+      * `stub` (default) — `StubEntityRouter`, regex-only, no network.
+      * `gliner2` — single multi-task GLiNER2 (v2 schema). Needs
+        `GLINER2_MODEL_PATH` or `PIONEER_MODEL_ID` + `PIONEER_API_KEY`.
+      * `two-model` — production: v2 schema (intent) + v3 NER-only
+        called in parallel via threadpool. Best NER quality (0.851
+        macro F1) and best intent (0.978 acc) but uses 2x model
+        budget. Needs `PIONEER_INTENT_MODEL_ID` + `PIONEER_NER_MODEL_ID`
+        + `PIONEER_API_KEY`. See `pioneer/MODELS.md`.
 
     AgenticTier LLM backend: selected via `BETTER_CONTEXT_AGENTIC=gemini`
     (requires `GEMINI_API_KEY`). Default is `noop` — a `StubLLMClient`
