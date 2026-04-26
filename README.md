@@ -101,6 +101,16 @@ data/           runtime SQLite db (gitignored)
   import-side-effect.
 - **Identity resolution (light)** -- deterministic email-match -> `SAME_AS`
   edges. Fuzzy + LLM triage stubbed for later.
+- **Conflict resolution** -- detection at the `add_node` MERGE seam. Per
+  attribute that disagrees, a deterministic decision table routes by
+  `FactConfidence` rung (HUMAN > EXACT > GROUNDED > INFERRED): equal
+  values auto-merge, ladder-broken ties auto-pick the higher rung, both
+  INFERRED route to LLM_TRIAGE (lane stub for v2), tied confident-rung
+  ESCALATEs to a queue. REST surface: `GET /api/conflicts`,
+  `GET /api/conflicts/{id}`, `POST /api/conflicts/{id}/resolve`. Human
+  resolutions go through `edit_node` so they carry full
+  `FactConfidence.HUMAN` provenance and are reversible like any edit.
+  See [`backend/conflict.py`](backend/conflict.py).
 - **Eval harness** -- `backend/eval/` extracts `(query, expected_node_ids)`
   from `tasks.jsonl`, runs the cascade, reports recall@5/@10, p50/p95
   latency, per-tier termination, escalation rate. Output Markdown to
@@ -122,7 +132,8 @@ data/           runtime SQLite db (gitignored)
 | Feature | Why it matters | Effort estimate |
 |---------|---------------|-----------------|
 | Cross-encoder rerank on retrieval cascade | Sharpens top-k ordering after RRF fusion | Small -- one model call after HybridTier emits, before relevance scoring |
-| Conflict resolution engine + UI | Auto-resolve known conflict types, queue ambiguous ones for humans | Large -- rule engine + LLM triage + resolution API + UI |
+| LLM triage lane (live Gemini call for `both_inferred` conflicts) | Auto-resolves "Acme Corp" vs "Acme Inc." via structured output; falls through to ESCALATE on `verdict=escalate` | Small -- gated on `QONTEXT_AGENTIC=gemini`, decision lane already wired |
+| Conflict resolution UI (inbox) | Visual queue + accept-suggestion / pick-other / merge-custom actions | Medium -- one new frontend page over the existing `/api/conflicts` endpoints |
 | MCP server | Claude-native tool interface over the API | Small -- thin wrappers around existing endpoints |
 
 See the full flow-by-flow status in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
@@ -157,6 +168,9 @@ See `backend/models/graph.py` (`GraphNode`, `GraphEdge`, `Provenance`,
 - `attributes` are open dicts on both nodes and edges.
 - `Provenance.extraction_method` ∈ {`direct_mapping`, `llm_extraction`,
   `rule_based`, `human`}.
+- `Provenance.attribute` names the node/edge attribute the trace covers
+  (used by conflict detection at MERGE time to find the per-attribute
+  confidence). `None` for legacy rows; new ingest writes always set it.
 - `Provenance.spec_version` links each fact back to the `MappingSpec`
   version that produced it.
 
@@ -219,6 +233,9 @@ Interactive docs at http://localhost:8000/docs (Swagger UI).
 | `POST /api/query` | Retrieval cascade: `{"query": "...", "context": {...}}` -> `QueryResult` (items + citations + tier_used + relevance) |
 | `GET /api/workflow` | List registered workflow names |
 | `POST /api/workflow/{name}` | Invoke a workflow: `{"payload": {...}, "ctx": {...}}` -> `WorkflowResult` |
+| `GET /api/conflicts?status=open` | List queued conflicts (paginated, filterable by `node_id` / `attribute`) |
+| `GET /api/conflicts/{id}` | A single conflict + both candidate sides |
+| `POST /api/conflicts/{id}/resolve` | Apply human resolution: `{"value": ..., "editor": "..."}` -> resolved `Conflict` (writes HUMAN provenance through `edit_node`) |
 
 ### Provenance trace (how to map graph data back to source files)
 

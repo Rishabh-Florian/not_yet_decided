@@ -30,6 +30,7 @@ from typing import Any, Iterable, Iterator, LiteralString, cast
 
 from neo4j import Driver, GraphDatabase
 
+from backend.conflict import Conflict, ConflictStore, reconcile
 from backend.models.graph import (
     FactConfidence,
     GraphEdge,
@@ -131,6 +132,19 @@ class GraphStore:
         self._init_sqlite()
         self._init_neo4j()
 
+        # Conflict detection at MERGE time. Resides in the same SQLite
+        # connection so conflict rows + provenance writes share one tx.
+        self._conflicts = ConflictStore(self._conn)
+
+    @property
+    def conflicts(self) -> ConflictStore:
+        """Public accessor for the embedded ConflictStore.
+
+        Used by the API layer to list/resolve conflicts without exposing
+        the SQLite connection directly.
+        """
+        return self._conflicts
+
     # ---------- lifecycle ----------
 
     def _init_sqlite(self) -> None:
@@ -147,12 +161,19 @@ class GraphStore:
         for ddl in [
             "ALTER TABLE provenance ADD COLUMN spec_version INTEGER",
             "ALTER TABLE provenance ADD COLUMN model_self_score REAL",
+            "ALTER TABLE provenance ADD COLUMN attribute TEXT",
         ]:
             try:
                 self._conn.execute(ddl)
             except sqlite3.OperationalError as e:
                 if "duplicate column name" not in str(e).lower():
                     raise
+        # Post-migration index — must come after ALTER TABLE adds `attribute`,
+        # otherwise CREATE INDEX fails on legacy databases.
+        self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_prov_node_attr "
+            "ON provenance(node_id, attribute)"
+        )
         self._conn.commit()
 
     def _run_migrations(self) -> None:
@@ -266,20 +287,48 @@ class GraphStore:
     # ---------- node ops ----------
 
     def add_node(self, node: GraphNode) -> GraphNode:
-        """Insert or merge a node by id. Scalar attribute conflicts = last-write-wins.
+        """Insert or merge a node by id with conflict-aware attribute writes.
 
         Provenance is appended (never replaces) so re-ingestion keeps the full
         trace history. Asserts canonical-type equality on match — id collisions
         across types (e.g. Person vs Organization for the same id) raise rather
         than silently merge.
 
-        Atomicity: SQLite provenance is staged first, the Neo4j MERGE runs
-        next, then SQLite is committed. On Neo4j failure SQLite rolls back.
-        On SQLite-commit failure we delete the just-merged Neo4j node by id
-        so the two stores cannot diverge.
+        Conflict resolution: when the node already exists, every incoming
+        attribute that disagrees with the existing value is routed through
+        :func:`backend.conflict.reconcile`. AUTO_PICK winners write through;
+        LLM_TRIAGE / ESCALATE keep the existing value and queue a row in the
+        `conflicts` table. Both losing and winning provenance always land in
+        the trace table (append-only) so the audit trail is complete.
+
+        Atomicity: SQLite provenance + conflict rows are staged first, the
+        Neo4j MERGE runs next, then SQLite is committed. On Neo4j failure
+        SQLite rolls back (dropping both the staged prov and any queued
+        conflicts). On SQLite-commit failure we delete the just-merged Neo4j
+        node by id so the two stores cannot diverge.
         """
+        # Conflict reconcile (only meaningful when the node already exists).
+        # `reconcile` mutates `node.attributes` to the resolved set so the
+        # subsequent Neo4j MERGE writes the right values; conflict rows are
+        # staged in the same SQLite tx as the provenance below.
+        existing = self.get_node(node.id)
+        if existing is not None:
+            try:
+                node.attributes = reconcile(
+                    node_id=node.id,
+                    existing_attrs=existing.attributes,
+                    existing_provenance=existing.provenance,
+                    incoming_attrs=node.attributes,
+                    incoming_provenance=node.provenance,
+                    conflict_store=self._conflicts,
+                )
+            except Exception:
+                self._conn.rollback()
+                raise
+
         # Stage provenance. Python's sqlite3 auto-begins a transaction on the
-        # first write; rollback on any exception undoes those writes.
+        # first write; rollback on any exception undoes those writes (and any
+        # conflict rows staged just above).
         try:
             for p in node.provenance:
                 self._insert_provenance(self._conn, p, node_id=node.id)
@@ -426,6 +475,7 @@ class GraphStore:
                 source_file="human_edits",
                 source_record_id=source_record_id,
                 source_field=attr_key,
+                attribute=attr_key,
                 extraction_method="human",
                 extraction_model=f"human:{editor}",
                 confidence=FactConfidence.HUMAN,
@@ -487,6 +537,49 @@ class GraphStore:
 
         node.provenance = self._provenance_for_node(node_id)
         return node
+
+    def resolve_conflict(
+        self,
+        conflict_id: int,
+        *,
+        value: Any,
+        editor: str,
+    ) -> Conflict:
+        """Apply a human resolution to a queued conflict.
+
+        Writes the chosen value to the graph through `edit_node` (so the
+        node's attribute provenance gets a fresh `FactConfidence.HUMAN`
+        row, making the resolution itself auditable + reversible like any
+        other edit), then flips the conflict row to `resolved`.
+
+        Raises:
+            KeyError: `conflict_id` is unknown OR the referenced node
+                was deleted between detection and resolution.
+            ValueError: the conflict is already resolved (resolutions
+                are append-only — surface a fresh edit through the edit
+                API instead of re-resolving).
+        """
+        c = self._conflicts.get(conflict_id)
+        if c is None:
+            raise KeyError(f"conflict {conflict_id} not found")
+        if c.status == "resolved":
+            raise ValueError(
+                f"conflict {conflict_id} is already resolved; "
+                "use the edit API for further updates"
+            )
+
+        # `edit_node` owns its own staged-tx (provenance → Neo4j → commit);
+        # if it fails, no conflict-status flip happens. The flip + commit
+        # below is its own micro-tx.
+        self.edit_node(c.node_id, {c.attribute: value}, editor)
+        resolved = self._conflicts.resolve(
+            conflict_id,
+            chosen_value=value,
+            resolution_method="human",
+            resolved_by=editor,
+        )
+        self._conn.commit()
+        return resolved
 
     def delete_node(self, node_id: str) -> None:
         # Cascade by hand: provenance lives in SQLite and references this node
@@ -773,15 +866,16 @@ class GraphStore:
         c.execute(
             """INSERT INTO provenance
                (node_id, edge_id, source_file, source_record_id, source_field,
-                extraction_method, extraction_model, extracted_at, confidence,
-                model_self_score, raw_value, spec_version)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                attribute, extraction_method, extraction_model, extracted_at,
+                confidence, model_self_score, raw_value, spec_version)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 node_id,
                 edge_id,
                 p.source_file,
                 p.source_record_id,
                 p.source_field,
+                p.attribute,
                 p.extraction_method,
                 p.extraction_model,
                 _iso(p.extracted_at),
@@ -870,6 +964,7 @@ class GraphStore:
             source_file=row["source_file"],
             source_record_id=row["source_record_id"],
             source_field=row["source_field"],
+            attribute=row["attribute"] if "attribute" in keys else None,
             extraction_method=row["extraction_method"],
             extraction_model=row["extraction_model"],
             confidence=FactConfidence(row["confidence"]),

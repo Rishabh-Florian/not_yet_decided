@@ -35,6 +35,12 @@ from backend.retrieval.workflows import (
     register_builtin_workflows,
 )
 
+from backend.conflict import (
+    Conflict,
+    ConflictListResponse,
+    ResolveConflictRequest,
+)
+
 from .models import (
     EdgeResponse,
     EditNodeRequest,
@@ -366,3 +372,48 @@ async def get_source_record(
         content_hash=rec.content_hash,
         ingested_at=rec.ingested_at,
     )
+
+
+# ---------- Conflict resolution API ----------
+
+
+@app.get("/api/conflicts", response_model=ConflictListResponse)
+async def list_conflicts(
+    status: str = Query("open", pattern="^(open|resolved)$"),
+    node_id: str | None = Query(None),
+    attribute: str | None = Query(None),
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    store: GraphStore = Depends(get_store),
+) -> ConflictListResponse:
+    rows = list(store.conflicts.list(
+        status=status,                          # type: ignore[arg-type]
+        node_id=node_id, attribute=attribute,
+        limit=limit, offset=offset,
+    ))
+    return ConflictListResponse(conflicts=rows, status=status, total=len(rows))  # type: ignore[arg-type]
+
+
+@app.get("/api/conflicts/{conflict_id}", response_model=Conflict)
+async def get_conflict(
+    conflict_id: int,
+    store: GraphStore = Depends(get_store),
+) -> Conflict:
+    c = store.conflicts.get(conflict_id)
+    if c is None:
+        raise HTTPException(404, f"conflict {conflict_id} not found")
+    return c
+
+
+@app.post("/api/conflicts/{conflict_id}/resolve", response_model=Conflict)
+async def resolve_conflict(
+    conflict_id: int,
+    body: ResolveConflictRequest,
+    store: GraphStore = Depends(get_store),
+) -> Conflict:
+    try:
+        return store.resolve_conflict(conflict_id, value=body.value, editor=body.editor)
+    except KeyError as e:
+        raise HTTPException(404, str(e)) from None
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from None

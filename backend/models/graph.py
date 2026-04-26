@@ -52,6 +52,11 @@ class Provenance:
     extraction_model: str           # e.g. "claude-sonnet-4-6" or "rule:email_parser_v1"
     confidence: FactConfidence      # categorical fact-trust label, never a float
     raw_value: str
+    attribute: str | None = None    # which attribute on the node/edge this trace describes;
+                                    # populated by ingestor / edit_node / llm_blocks. Conflict
+                                    # detection at MERGE time uses it to find the per-attribute
+                                    # confidence. None for legacy rows written before the column
+                                    # existed — those default to EXACT during reconcile().
     model_self_score: float | None = None   # LLM self-rated number, audit-only; never used for filtering
     extracted_at: datetime | None = field(default_factory=_now)
     spec_version: int | None = None # MappingSpec version that produced this fact

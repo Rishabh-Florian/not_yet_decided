@@ -544,6 +544,7 @@ def _build_attributes(
             source_file=source_file,
             source_record_id=source_record_id,
             source_field=used_path,
+            attribute=fm.attribute,
             extraction_method="direct_mapping",
             extraction_model=f"spec:v{spec_version}",
             confidence=FactConfidence.EXACT,

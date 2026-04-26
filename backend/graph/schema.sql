@@ -40,6 +40,9 @@ CREATE TABLE IF NOT EXISTS provenance (
     source_file       TEXT NOT NULL,
     source_record_id  TEXT NOT NULL,
     source_field      TEXT NOT NULL,
+    attribute         TEXT,                          -- which node/edge attribute this trace covers;
+                                                     -- conflict detection in add_node uses this to
+                                                     -- look up per-attribute confidence
     extraction_method TEXT NOT NULL,
     extraction_model  TEXT NOT NULL,
     extracted_at      TEXT NOT NULL,
@@ -56,6 +59,9 @@ CREATE TABLE IF NOT EXISTS provenance (
 CREATE INDEX IF NOT EXISTS idx_prov_node ON provenance(node_id);
 CREATE INDEX IF NOT EXISTS idx_prov_edge ON provenance(edge_id);
 CREATE INDEX IF NOT EXISTS idx_prov_source_record ON provenance(source_file, source_record_id);
+-- idx_prov_node_attr (on the post-migration `attribute` column) is created
+-- in `GraphStore._init_sqlite` AFTER the ALTER TABLE that adds the column,
+-- so legacy databases don't fail schema bootstrap.
 
 ------------------------------------------------------------------------------
 -- INGESTION CONTROL PLANE
@@ -126,3 +132,51 @@ CREATE TABLE IF NOT EXISTS dead_letter (
 );
 
 CREATE INDEX IF NOT EXISTS idx_dead_letter_run ON dead_letter(run_id);
+
+------------------------------------------------------------------------------
+-- CONFLICTS
+-- One row per (node_id, attribute) conflict that needs human or LLM action.
+-- AUTO_MERGE / AUTO_PICK verdicts never land here — those are silent in the
+-- store layer because the existing append-only `provenance` already records
+-- every competing fact (the "loser" is auditable via its own prov row).
+-- Only LLM_TRIAGE and ESCALATE persist; status flips to 'resolved' once a
+-- chosen_value is written back through the API.
+------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS conflicts (
+    id                          INTEGER PRIMARY KEY AUTOINCREMENT,
+    node_id                     TEXT NOT NULL,
+    attribute                   TEXT NOT NULL,
+    -- existing side: the value already in the graph at MERGE time
+    existing_value              TEXT NOT NULL,
+    existing_confidence         TEXT NOT NULL,
+    existing_source_file        TEXT NOT NULL,
+    existing_source_record_id   TEXT NOT NULL,
+    -- incoming side: the value that lost the merge and is now queued
+    incoming_value              TEXT NOT NULL,
+    incoming_confidence         TEXT NOT NULL,
+    incoming_source_file        TEXT NOT NULL,
+    incoming_source_record_id   TEXT NOT NULL,
+    -- routing
+    verdict                     TEXT NOT NULL
+        CHECK (verdict IN ('llm_triage','escalate')),
+    reason                      TEXT NOT NULL,
+    -- lifecycle
+    status                      TEXT NOT NULL DEFAULT 'open'
+        CHECK (status IN ('open','resolved')),
+    detected_at                 TEXT NOT NULL,
+    resolved_at                 TEXT,
+    resolved_by                 TEXT,
+    chosen_value                TEXT,
+    resolution_method           TEXT
+        CHECK (resolution_method IS NULL
+               OR resolution_method IN ('human','llm'))
+);
+
+-- Only one OPEN conflict per (node, attribute) at any given time.
+-- Re-ingestion replaces the open row's incoming side; resolved rows accumulate.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_conflicts_open_unique
+    ON conflicts(node_id, attribute)
+    WHERE status = 'open';
+
+CREATE INDEX IF NOT EXISTS idx_conflicts_status ON conflicts(status);
+CREATE INDEX IF NOT EXISTS idx_conflicts_node ON conflicts(node_id);
