@@ -63,7 +63,7 @@ export default function HeroPage() {
                 WebkitTextFillColor: "transparent",
               }}
             >
-              Made legible.
+              Made legible with Better Context!
             </span>
           </h1>
         </motion.div>

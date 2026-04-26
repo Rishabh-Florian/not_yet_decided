@@ -40,6 +40,8 @@ export default function HeroScene() {
                 label={intg.label}
                 svgDataUri={brand.svgDataUri}
                 bgColor={brand.bgColor}
+                labelColor={brand.labelColor}
+                drawLogo={brand.drawLogo}
               />
               <DataFlowLine
                 phi={intg.phi}

@@ -50,7 +50,8 @@
       "mcp__playwright__browser_evaluate",
       "Bash(node *)",
       "Bash(lsof -ti:3000,3001)",
-      "Bash(echo \"PID: $!\")"
+      "Bash(echo \"PID: $!\")",
+      "Bash(python3 *)"
     ]
   },
   "enabledMcpjsonServers": [

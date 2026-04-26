@@ -11,17 +11,12 @@ interface Props {
   label: string;
   svgDataUri: string;
   bgColor: string;
+  labelColor?: string;
+  /** Optional: draw logo directly on canvas instead of loading SVG */
+  drawLogo?: (ctx: CanvasRenderingContext2D, size: number) => void;
 }
 
-function makeIconTexture(svgDataUri: string, label: string, bgColor: string): THREE.CanvasTexture {
-  const size = 128;
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d")!;
-
-  // Rounded rect clip
-  const r = 22;
+function roundRect(ctx: CanvasRenderingContext2D, size: number, r: number) {
   ctx.beginPath();
   ctx.moveTo(r, 0);
   ctx.lineTo(size - r, 0);
@@ -33,60 +28,85 @@ function makeIconTexture(svgDataUri: string, label: string, bgColor: string): TH
   ctx.lineTo(0, r);
   ctx.quadraticCurveTo(0, 0, r, 0);
   ctx.closePath();
-  ctx.fillStyle = bgColor;
-  ctx.fill();
+}
 
-  // Logo image
-  const img = new window.Image();
-  img.onload = () => {
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(r, 0);
-    ctx.lineTo(size - r, 0);
-    ctx.quadraticCurveTo(size, 0, size, r);
-    ctx.lineTo(size, size - r);
-    ctx.quadraticCurveTo(size, size, size - r, size);
-    ctx.lineTo(r, size);
-    ctx.quadraticCurveTo(0, size, 0, size - r);
-    ctx.lineTo(0, r);
-    ctx.quadraticCurveTo(0, 0, r, 0);
-    ctx.closePath();
-    ctx.clip();
-    // Center logo, leave room for label at bottom
-    const logoSize = 62;
-    const logoX = (size - logoSize) / 2;
-    const logoY = 18;
-    ctx.drawImage(img, logoX, logoY, logoSize, logoSize);
-    ctx.restore();
+function makeIconTexture(
+  svgDataUri: string,
+  label: string,
+  bgColor: string,
+  labelColor: string,
+  drawLogo?: (ctx: CanvasRenderingContext2D, size: number) => void,
+): THREE.CanvasTexture {
+  const size = 256; // Higher res for crispness
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
 
-    // Label
-    ctx.font = "bold 14px system-ui, -apple-system, sans-serif";
-    ctx.fillStyle = "#ffffff";
+  function drawCard() {
+    roundRect(ctx, size, 36);
+    ctx.fillStyle = bgColor;
+    ctx.fill();
+  }
+
+  function drawLabel() {
+    const fontSize = 22;
+    ctx.font = `bold ${fontSize}px system-ui, -apple-system, sans-serif`;
+    ctx.fillStyle = labelColor;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(label, size / 2, size - 17);
+    ctx.fillText(label, size / 2, size - 26);
+  }
 
+  drawCard();
+
+  if (drawLogo) {
+    // Direct canvas draw — no image loading needed
+    ctx.save();
+    roundRect(ctx, size, 36);
+    ctx.clip();
+    drawLogo(ctx, size);
+    ctx.restore();
+    drawLabel();
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+
+  const img = new window.Image();
+  img.onload = () => {
+    drawCard();
+    ctx.save();
+    roundRect(ctx, size, 36);
+    ctx.clip();
+    const logoSize = 128;
+    ctx.drawImage(img, (size - logoSize) / 2, 24, logoSize, logoSize);
+    ctx.restore();
+    drawLabel();
     texture.needsUpdate = true;
   };
   img.src = svgDataUri;
 
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
   return texture;
 }
 
-export default function OrbitingIcon({ phi, theta, radius, speed, label, svgDataUri, bgColor }: Props) {
+export default function OrbitingIcon({
+  phi, theta, radius, speed, label, svgDataUri, bgColor, labelColor = "#ffffff", drawLogo,
+}: Props) {
   const spriteRef = useRef<THREE.Sprite>(null);
 
   const material = useMemo(() => {
-    const tex = makeIconTexture(svgDataUri, label, bgColor);
+    const tex = makeIconTexture(svgDataUri, label, bgColor, labelColor, drawLogo);
     return new THREE.SpriteMaterial({
       map: tex,
       transparent: true,
       depthWrite: true,
       depthTest: true,
     });
-  }, [svgDataUri, label, bgColor]);
+  }, [svgDataUri, label, bgColor, labelColor, drawLogo]);
 
   useFrame(() => {
     if (!spriteRef.current) return;
@@ -99,5 +119,5 @@ export default function OrbitingIcon({ phi, theta, radius, speed, label, svgData
     );
   });
 
-  return <sprite ref={spriteRef} material={material} scale={[0.55, 0.55, 0.55]} />;
+  return <sprite ref={spriteRef} material={material} scale={[0.54, 0.54, 0.54]} />;
 }
