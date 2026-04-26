@@ -19,7 +19,7 @@
 > | REST API — Graph pattern query | **done** | `POST /api/graph/query` — typed pattern DSL |
 > | REST API — Edit API (human-in-the-loop) | **done** | `PUT /api/graph/node/{id}` — provenance-tracked edits |
 > | VFS API (ls, cat, grep, find, stat, tree) | not yet | VFS is a logical view (no disk materialization) — endpoints not built |
-> | Search API (semantic + hybrid, Neo4j HNSW) | partial | R0/R1/R2/R3/R4 tiers landed (cascade + Cypher/fulltext + vector+RRF + Pioneer.ai GLiNER2 pre-router + bounded Gemini function-calling agentic tier; LLM client behind a Protocol with stub/noop fallback). Cross-encoder rerank still pending. Embedding population (`backend/retrieval/embed.py`) is a manual one-shot pass. |
+> | Search API (semantic + hybrid, Neo4j HNSW) | **done** (R0/R1/R2/R3/R4) | Cascade + Cypher/fulltext + vector+RRF + **fine-tuned 205M GLiNER2 SLM pre-router (Pioneer Round 1: 91.1% intent acc / 0.394 macro NER F1 / 467ms p95 — beats GPT-4o on all three)** + bounded Gemini function-calling agentic tier. Cross-encoder rerank still pending. Embedding population (`backend/retrieval/embed.py`) is a manual one-shot pass. |
 > | Workflow API (frozen-policy retrieval) | **done** | R5a framework + R5b `answer-customer-email` + R5c `thread-summary`. `GET/POST /api/workflow{,/{name}}`. Built-ins registered explicitly at FastAPI startup via `register_builtin_workflows()` (no import-side-effect). |
 > | Conflict resolution engine + UI | not yet | Rule-based + LLM triage designed, not implemented |
 > | MCP server (for Claude / AI agents) | not yet | MCP tool wrappers over existing API |
@@ -1243,13 +1243,26 @@ cascade up-front.
 **Router backend.** Hidden behind the `EntityRouter` Protocol:
 - `StubEntityRouter` (default) — deterministic regex classifier; no
   model dependency. Keeps CI green and the cascade booting on
-  machines without the fine-tune.
-- `GLiNER2EntityRouter` (production) — loads weights from
-  `GLINER2_MODEL_PATH` (local) or `PIONEER_AI_MODEL_ID` (Pioneer
-  endpoint). Fail-fast if neither is set. Selected by
-  `QONTEXT_ROUTER=gliner2`. Requires `uv add gliner` and the
-  Pioneer.ai fine-tune (see
-  `pioneer/README.md`).
+  machines without the fine-tuned weights downloaded.
+- `GLiNER2EntityRouter` (production) — **fine-tuned 205M-parameter
+  GLiNER2 SLM** trained on Pioneer.ai (multi-task: 4-way intent
+  classification + 6-type NER in one forward pass, no separate models).
+  Round 1 eval (45-row held-out set, 2026-04-26):
+
+  | Metric | Base GLiNER2 | GPT-4o | Fine-tuned v1 |
+  |---|---|---|---|
+  | Intent accuracy | 0.533 | 0.867 | **0.911** |
+  | Macro NER F1 | 0.300 | 0.337 | **0.394** |
+  | p95 latency | 991 ms | 1699 ms | **467 ms** (3.6× faster than GPT-4o) |
+  | Cost per 1k queries | $0 | ~$5 | $0 |
+
+  Loads weights from `GLINER2_MODEL_PATH` (local) or
+  `PIONEER_AI_MODEL_ID` (Pioneer endpoint). Fail-fast if neither is
+  set. Selected by `QONTEXT_ROUTER=gliner2`. Requires `uv add gliner`
+  and the downloaded weights at `pioneer/weights/<model-name>/`.
+  See `pioneer/README.md` for the fine-tune workflow and
+  `pioneer/bench/results/comparison.md` for the full eval breakdown
+  (per-intent, per-entity, screenshots).
 
 **AgenticTier backend.** Hidden behind the `LLMClient` Protocol
 (mirrors how `Embedder` and `EntityRouter` are isolated):

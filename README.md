@@ -33,10 +33,19 @@ data/           runtime SQLite db (gitignored)
   (`exact` -> `router` -> `hybrid` -> `agentic`) with `stub` as
   terminal fallback. Tiers escalate on algorithmic relevance only
   (cosine / BM25 / RRF / exact-match indicator). Router pre-routes via
-  GLiNER2 (intent + NER); agentic uses bounded Gemini function-calling
-  over a 6-tool surface. Each tier is hidden behind a `Tier` ABC; LLM
-  / embedder / router each have a stub default so CI runs without
-  weights or API keys.
+  a **fine-tuned 205M GLiNER2 SLM** (Pioneer.ai, multi-task: intent
+  classification + NER in one forward pass); agentic uses bounded
+  Gemini function-calling over a 6-tool surface. Each tier is hidden
+  behind a `Tier` ABC; LLM / embedder / router each have a stub default
+  so CI runs without weights or API keys.
+- **Fine-tuned router (Pioneer SLM)** -- 4-way intent classification +
+  6-type NER in 467 ms p95 on CPU. Round 1 numbers vs frontier:
+  91.1 % intent acc / 0.394 macro NER F1 (base GLiNER2: 53.3 / 0.300;
+  GPT-4o: 86.7 / 0.337). Beats GPT-4o on quality AND latency
+  (3.6× faster) AND cost ($0/query local vs ~$5/1k API). See
+  `pioneer/bench/results/comparison.md` for the full 3-column table
+  + screenshots; Round 2 in progress targets the remaining gaps
+  (`ambiguous` intent, `ticket_id`/`date` NER coverage).
 - **Workflow framework** -- `POST /api/workflow/{name}` invokes a
   frozen-policy recipe over a locked tier subset. Two ship: 
   `answer-customer-email` (deterministic: T1 sender + neighbors -> T3
@@ -237,7 +246,7 @@ Tier algorithms (each documents its own scoring):
 | Tier | Algorithm |
 |---|---|
 | `exact` | Cypher id lookup + Neo4j fulltext (BM25-similar, normalized) |
-| `router` | Pioneer.ai GLiNER2 (intent + NER); on `lookup` inline-delegates to ExactTier; emits `route_to` for `search` / `analytical` |
+| `router` | **Fine-tuned 205M GLiNER2 SLM** (Pioneer.ai, multi-task: intent + NER, single forward pass). Round 1 numbers: 91.1 % intent acc, 0.394 macro NER F1, 467 ms p95 — beats GPT-4o (86.7 / 0.337 / 1699 ms). On `lookup` inline-delegates to ExactTier; emits `route_to` for `search` / `analytical` |
 | `hybrid` | Neo4j HNSW vector + fulltext fused by Reciprocal Rank Fusion (k=60) |
 | `agentic` | Bounded Gemini function-calling loop (max 6 calls, 10s wall-clock); 6-tool surface; relevance ∈ {0.7 grounded, 0.3 ungrounded, 0.0 failed} |
 | `stub` | terminal fallback, always 0 hits |
@@ -252,10 +261,12 @@ keys. Production wiring selected via env:
   `uv run python -m backend.retrieval.embed [--limit N]` writes
   `:Entity.vector` for matched nodes (idempotent, skips
   already-embedded).
-- `QONTEXT_ROUTER=gliner2` -- uses fine-tuned GLiNER2; needs
-  `uv add gliner` and weights at `GLINER2_MODEL_PATH` (see
-  `pioneer/README.md` for the Pioneer.ai
-  fine-tune flow).
+- `QONTEXT_ROUTER=gliner2` -- uses our fine-tuned 205M GLiNER2 SLM
+  (Round 1 trained on Pioneer; ships local once weights are downloaded
+  to `pioneer/weights/<model-name>/`). Needs `uv add gliner` and
+  `GLINER2_MODEL_PATH` set. See `pioneer/README.md` for the Pioneer.ai
+  workflow and `pioneer/bench/results/comparison.md` for the
+  3-column eval (vs base GLiNER2 vs GPT-4o).
 - `QONTEXT_AGENTIC=gemini` -- uses `gemini-2.5-flash`; needs
   `GEMINI_API_KEY`. Same setting also routes any workflow that needs
   an LLM (`thread-summary`, `answer-customer-email`).
