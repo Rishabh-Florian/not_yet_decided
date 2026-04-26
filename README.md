@@ -293,18 +293,6 @@ TypeScript:
 cd frontend && npx tsc --noEmit        # zero errors
 ```
 
----
-
-## What's not built yet
-
-| Feature | Notes |
-|---------|-------|
-| Cross-encoder rerank | Sharpens top-k ordering after RRF fusion. One model call post-HybridTier. |
-| Conflict resolution UI (inbox) | Engine + REST are done. Visual queue + accept/pick/merge actions — one new frontend page over `/api/conflicts`. |
-| MCP server | Thin wrappers around existing API for Claude / AI agents. |
-
----
-
 ## Key design decisions
 
 - **No per-vendor parsers.** MappingSpec + one Ingestor handles all 14 sources. Adding a new data source = adding one YAML file.
