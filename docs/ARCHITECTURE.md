@@ -1228,6 +1228,18 @@ through to the next slot. The earlier `QueryContext.prefer_tier` hook
 also still works — it lets the *caller* (not a tier) reorder the
 cascade up-front.
 
+**Embedder backend** (HybridTier vector arm). Hidden behind the
+`Embedder` Protocol:
+- `StubEmbedder` (default) — deterministic hash-based vector with NO
+  semantic signal. Keeps CI green and the cascade booting; HybridTier
+  vector arm contributes nothing.
+- `BgeSmallEmbedder` (production) — `BAAI/bge-small-en-v1.5` via the
+  bundled `sentence-transformers`. Selected by `QONTEXT_EMBEDDER=bge`.
+  Requires a one-shot offline pass to populate `:Entity.vector`:
+  `uv run python -m backend.retrieval.embed [--limit N] [--node-type T]`
+  (idempotent, skips already-embedded). Without the pass the vector
+  index returns nothing and HybridTier degenerates to fulltext-only.
+
 **Router backend.** Hidden behind the `EntityRouter` Protocol:
 - `StubEntityRouter` (default) — deterministic regex classifier; no
   model dependency. Keeps CI green and the cascade booting on
