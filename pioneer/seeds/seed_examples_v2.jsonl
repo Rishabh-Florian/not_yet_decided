@@ -1,0 +1,497 @@
+{"query": "Sum of invoiced amounts for customer morgk 2021-12-30", "intent": "analytical", "entities": {"customer_id": ["morgk"], "date": ["2021-12-30"]}}
+{"query": "Tell emp_0246 that ticket 80391 is resolved", "intent": "lookup", "entities": {"emp_id": ["emp_0246"], "ticket_id": ["80391"]}}
+{"query": "Show me ticket 19676", "intent": "lookup", "entities": {"ticket_id": ["19676"]}}
+{"query": "Customer hungc order history please", "intent": "lookup", "entities": {"customer_id": ["hungc"]}}
+{"query": "Total support chats by emp_1031 last week", "intent": "analytical", "entities": {"emp_id": ["emp_1031"], "date": ["last week"]}}
+{"query": "never mind", "intent": "ambiguous", "entities": {}}
+{"query": "Pull recent posts from the Engineering team", "intent": "search", "entities": {"department": ["Engineering"]}}
+{"query": "Show me posts mentioning the AI roadmap", "intent": "search", "entities": {}}
+{"query": "Surface emails from the HR team", "intent": "search", "entities": {"department": ["HR"]}}
+{"query": "Compare ticket counts for Sales and BPO", "intent": "analytical", "entities": {"department": ["Sales", "BPO"]}}
+{"query": "Show projects led by the Information Technology team", "intent": "search", "entities": {"department": ["Information Technology"]}}
+{"query": "Pull the order placed by customer alfki on Q3 2024", "intent": "lookup", "entities": {"customer_id": ["alfki"], "date": ["Q3 2024"]}}
+{"query": "What is the Finance team working on this quarter?", "intent": "search", "entities": {"department": ["Finance"]}}
+{"query": "Who is the Management lead currently?", "intent": "search", "entities": {"department": ["Management"]}}
+{"query": "show me", "intent": "ambiguous", "entities": {}}
+{"query": "Top 5 products by revenue this year", "intent": "analytical", "entities": {"date": ["this year"]}}
+{"query": "Show projects led by the Management team", "intent": "search", "entities": {"department": ["Management"]}}
+{"query": "Sum of invoiced amounts for customer reggc 2021-12-30", "intent": "analytical", "entities": {"customer_id": ["reggc"], "date": ["2021-12-30"]}}
+{"query": "Customer welli bought D-Link DIR-615 — pull the invoice", "intent": "lookup", "entities": {"customer_id": ["welli"], "product": ["D-Link DIR-615"]}}
+{"query": "Who handles Business Development escalations?", "intent": "search", "entities": {"department": ["Business Development"]}}
+{"query": "Pull recent posts from the BPO team", "intent": "search", "entities": {"department": ["BPO"]}}
+{"query": "Show complaints filed by customer blaus", "intent": "lookup", "entities": {"customer_id": ["blaus"]}}
+{"query": "Pull recent posts from the Management team", "intent": "search", "entities": {"department": ["Management"]}}
+{"query": "Total sales of B08RWCZ6SY 2022-06-17", "intent": "analytical", "entities": {"product": ["B08RWCZ6SY"], "date": ["2022-06-17"]}}
+{"query": "test", "intent": "ambiguous", "entities": {}}
+{"query": "Compare sales for emp_0684 and emp_0972 in 2018-12-02", "intent": "analytical", "entities": {"emp_id": ["emp_0684", "emp_0972"], "date": ["2018-12-02"]}}
+{"query": "How many resumes were uploaded Q4 2024?", "intent": "analytical", "entities": {"date": ["Q4 2024"]}}
+{"query": "bar", "intent": "ambiguous", "entities": {}}
+{"query": "Search BPO strategy docs", "intent": "search", "entities": {"department": ["BPO"]}}
+{"query": "Find escalation patterns in Management", "intent": "search", "entities": {"department": ["Management"]}}
+{"query": "Assign ticket 35181 to emp_0865", "intent": "lookup", "entities": {"ticket_id": ["35181"], "emp_id": ["emp_0865"]}}
+{"query": "Find ticket 77286 raised by emp_1221 on Q4 2024", "intent": "lookup", "entities": {"ticket_id": ["77286"], "emp_id": ["emp_1221"], "date": ["Q4 2024"]}}
+{"query": "Who is the Information Technology lead currently?", "intent": "search", "entities": {"department": ["Information Technology"]}}
+{"query": "hmm", "intent": "ambiguous", "entities": {}}
+{"query": "data", "intent": "ambiguous", "entities": {}}
+{"query": "Sum of invoiced amounts for customer prini 2024-03-15", "intent": "analytical", "entities": {"customer_id": ["prini"], "date": ["2024-03-15"]}}
+{"query": "Move emp_0313 to the Finance team", "intent": "lookup", "entities": {"emp_id": ["emp_0313"], "department": ["Finance"]}}
+{"query": "Find feedback on the new performance review cycle", "intent": "search", "entities": {}}
+{"query": "Compare sales for emp_0622 and emp_9008 in last month", "intent": "analytical", "entities": {"emp_id": ["emp_0622", "emp_9008"], "date": ["last month"]}}
+{"query": "Get the manager of employee emp_0959", "intent": "lookup", "entities": {"emp_id": ["emp_0959"]}}
+{"query": "Move emp_1155 to the Business Development team", "intent": "lookup", "entities": {"emp_id": ["emp_1155"], "department": ["Business Development"]}}
+{"query": "Show me employees with python and machine learning skills who joined after 2022", "intent": "search", "entities": {}}
+{"query": "Show me recent emails about budget reviews", "intent": "search", "entities": {}}
+{"query": "How many employees joined Engineering July 2023?", "intent": "analytical", "entities": {"department": ["Engineering"], "date": ["July 2023"]}}
+{"query": "Top 3 employees by ticket count in Engineering", "intent": "analytical", "entities": {"department": ["Engineering"]}}
+{"query": "Find Finance performance reviews", "intent": "search", "entities": {"department": ["Finance"]}}
+{"query": "How many emails were sent this quarter?", "intent": "analytical", "entities": {"date": ["this quarter"]}}
+{"query": "How much did customer seves spend 2019-04-25?", "intent": "analytical", "entities": {"customer_id": ["seves"], "date": ["2019-04-25"]}}
+{"query": "not sure", "intent": "ambiguous", "entities": {}}
+{"query": "update", "intent": "ambiguous", "entities": {}}
+{"query": "home", "intent": "ambiguous", "entities": {}}
+{"query": "Tell emp_0269 that ticket 36662 is resolved", "intent": "lookup", "entities": {"emp_id": ["emp_0269"], "ticket_id": ["36662"]}}
+{"query": "Show me reviews of product CEDO 65W", "intent": "lookup", "entities": {"product": ["CEDO 65W"]}}
+{"query": "Average customer rating for products in the Business Development category", "intent": "analytical", "entities": {"department": ["Business Development"]}}
+{"query": "Sum of leaves taken by Engineering team 2021-12-30", "intent": "analytical", "entities": {"department": ["Engineering"], "date": ["2021-12-30"]}}
+{"query": "Total sales of Saifsmart Outlet yesterday", "intent": "analytical", "entities": {"product": ["Saifsmart Outlet"], "date": ["yesterday"]}}
+{"query": "Trend of B0B3TBY2YX sales over this month", "intent": "analytical", "entities": {"product": ["B0B3TBY2YX"], "date": ["this month"]}}
+{"query": "Compare profiles of emp_0159 and emp_0587", "intent": "lookup", "entities": {"emp_id": ["emp_0159", "emp_0587"]}}
+{"query": "Find emails between emp_1124 and emp_0915", "intent": "lookup", "entities": {"emp_id": ["emp_1124", "emp_0915"]}}
+{"query": "How much did customer godos spend last quarter?", "intent": "analytical", "entities": {"customer_id": ["godos"], "date": ["last quarter"]}}
+{"query": "How much did customer morgk spend 2021-12-30?", "intent": "analytical", "entities": {"customer_id": ["morgk"], "date": ["2021-12-30"]}}
+{"query": "settings", "intent": "ambiguous", "entities": {}}
+{"query": "Total sales of B08D9NDZ1Y 2018-12-02", "intent": "analytical", "entities": {"product": ["B08D9NDZ1Y"], "date": ["2018-12-02"]}}
+{"query": "Customer lehms bought ZEBRONICS Zeb-Dash — pull the invoice", "intent": "lookup", "entities": {"customer_id": ["lehms"], "product": ["ZEBRONICS Zeb-Dash"]}}
+{"query": "Customer frans order history please", "intent": "lookup", "entities": {"customer_id": ["frans"]}}
+{"query": "Get details of ticket id 19676", "intent": "lookup", "entities": {"ticket_id": ["19676"]}}
+{"query": "Surface emails from the Sales team", "intent": "search", "entities": {"department": ["Sales"]}}
+{"query": "Send a message to emp_0882 about the deployment", "intent": "lookup", "entities": {"emp_id": ["emp_0882"]}}
+{"query": "Sum of leaves taken by Sales team the past 6 months", "intent": "analytical", "entities": {"department": ["Sales"], "date": ["the past 6 months"]}}
+{"query": "Show conversations involving emp_1089 from the past 30 days", "intent": "lookup", "entities": {"emp_id": ["emp_1089"], "date": ["the past 30 days"]}}
+{"query": "How many emails were sent last quarter?", "intent": "analytical", "entities": {"date": ["last quarter"]}}
+{"query": "Compare ticket counts for HR and BPO", "intent": "analytical", "entities": {"department": ["HR", "BPO"]}}
+{"query": "Pull recent posts from the HR team", "intent": "search", "entities": {"department": ["HR"]}}
+{"query": "Find the HR team's policy documents", "intent": "search", "entities": {"department": ["HR"]}}
+{"query": "Find the latest hire in Sales", "intent": "search", "entities": {"department": ["Sales"]}}
+{"query": "Trend of customer complaints over 2023-10-04", "intent": "analytical", "entities": {"date": ["2023-10-04"]}}
+{"query": "Find the Sales department's onboarding docs", "intent": "search", "entities": {"department": ["Sales"]}}
+{"query": "Find emails sent by emp_0869", "intent": "lookup", "entities": {"emp_id": ["emp_0869"]}}
+{"query": "What is the email of emp_0512?", "intent": "lookup", "entities": {"emp_id": ["emp_0512"]}}
+{"query": "Update the price of B09VH568H7 to ₹999", "intent": "lookup", "entities": {"product": ["B09VH568H7"]}}
+{"query": "Compare ticket counts for BPO and Management", "intent": "analytical", "entities": {"department": ["BPO", "Management"]}}
+{"query": "List recent hires in HR", "intent": "search", "entities": {"department": ["HR"]}}
+{"query": "Compare ticket counts for Business Development and Information Technology", "intent": "analytical", "entities": {"department": ["Business Development", "Information Technology"]}}
+{"query": "Search Sales strategy docs", "intent": "search", "entities": {"department": ["Sales"]}}
+{"query": "Trend of customer complaints over FY23", "intent": "analytical", "entities": {"date": ["FY23"]}}
+{"query": "Pull invoice for customer_id whitc", "intent": "lookup", "entities": {"customer_id": ["whitc"]}}
+{"query": "How many employees joined Information Technology Q1 2024?", "intent": "analytical", "entities": {"department": ["Information Technology"], "date": ["Q1 2024"]}}
+{"query": "Who handles billing escalations on the customer success team", "intent": "search", "entities": {}}
+{"query": "Sum of leaves taken by BPO team the past 30 days", "intent": "analytical", "entities": {"department": ["BPO"], "date": ["the past 30 days"]}}
+{"query": "Average review rating for product POPIO Tempered", "intent": "analytical", "entities": {"product": ["POPIO Tempered"]}}
+{"query": "How many emails were sent 2020-09-02?", "intent": "analytical", "entities": {"date": ["2020-09-02"]}}
+{"query": "Show me documentation owned by Information Technology", "intent": "search", "entities": {"department": ["Information Technology"]}}
+{"query": "Count of VPN outages over FY23", "intent": "analytical", "entities": {"date": ["FY23"]}}
+{"query": "Count of VPN outages over last quarter", "intent": "analytical", "entities": {"date": ["last quarter"]}}
+{"query": "Pull the order placed by customer ocean on last year", "intent": "lookup", "entities": {"customer_id": ["ocean"], "date": ["last year"]}}
+{"query": "Count messages sent by emp_0681 during Q1 2024", "intent": "analytical", "entities": {"emp_id": ["emp_0681"], "date": ["Q1 2024"]}}
+{"query": "Show complaints filed by customer bsbev", "intent": "lookup", "entities": {"customer_id": ["bsbev"]}}
+{"query": "Notify emp_0545 about the new HR policy", "intent": "lookup", "entities": {"emp_id": ["emp_0545"]}}
+{"query": "details", "intent": "ambiguous", "entities": {}}
+{"query": "Top 5 products by revenue Q1 2024", "intent": "analytical", "entities": {"date": ["Q1 2024"]}}
+{"query": "Show me Sales team chats", "intent": "search", "entities": {"department": ["Sales"]}}
+{"query": "Count messages sent by emp_0323 during the past 6 months", "intent": "analytical", "entities": {"emp_id": ["emp_0323"], "date": ["the past 6 months"]}}
+{"query": "Find Engineering performance reviews", "intent": "search", "entities": {"department": ["Engineering"]}}
+{"query": "Sum of invoiced amounts for customer vinet Q3 2024", "intent": "analytical", "entities": {"customer_id": ["vinet"], "date": ["Q3 2024"]}}
+{"query": "Top 5 products by revenue last month", "intent": "analytical", "entities": {"date": ["last month"]}}
+{"query": "Top 5 products by revenue FY23", "intent": "analytical", "entities": {"date": ["FY23"]}}
+{"query": "the system", "intent": "ambiguous", "entities": {}}
+{"query": "Trend of customer complaints over last month", "intent": "analytical", "entities": {"date": ["last month"]}}
+{"query": "Count of VPN outages over 2022-06-17", "intent": "analytical", "entities": {"date": ["2022-06-17"]}}
+{"query": "Find the Finance department's onboarding docs", "intent": "search", "entities": {"department": ["Finance"]}}
+{"query": "How many resumes were uploaded 2018-12-02?", "intent": "analytical", "entities": {"date": ["2018-12-02"]}}
+{"query": "Find shipping orders for customer_id: romey", "intent": "lookup", "entities": {"customer_id": ["romey"]}}
+{"query": "How many active accounts does the customer support team handle daily on average?", "intent": "analytical", "entities": {}}
+{"query": "Customer support chats handled by emp_0166 on this year", "intent": "lookup", "entities": {"emp_id": ["emp_0166"], "date": ["this year"]}}
+{"query": "click here", "intent": "ambiguous", "entities": {}}
+{"query": "Compare ticket counts for HR and Business Development", "intent": "analytical", "entities": {"department": ["HR", "Business Development"]}}
+{"query": "results", "intent": "ambiguous", "entities": {}}
+{"query": "Compare sales for emp_9003 and emp_0177 in this month", "intent": "analytical", "entities": {"emp_id": ["emp_9003", "emp_0177"], "date": ["this month"]}}
+{"query": "How many products were updated March 2024?", "intent": "analytical", "entities": {"date": ["March 2024"]}}
+{"query": "Pull catalog entry for product_id House of", "intent": "lookup", "entities": {"product": ["House of"]}}
+{"query": "Show complaints filed by customer folko", "intent": "lookup", "entities": {"customer_id": ["folko"]}}
+{"query": "Compare ticket counts for Engineering and BPO", "intent": "analytical", "entities": {"department": ["Engineering", "BPO"]}}
+{"query": "Show me documentation owned by Finance", "intent": "search", "entities": {"department": ["Finance"]}}
+{"query": "Count tickets raised by emp_1119", "intent": "analytical", "entities": {"emp_id": ["emp_1119"]}}
+{"query": "Assign ticket 12578 to emp_0965", "intent": "lookup", "entities": {"ticket_id": ["12578"], "emp_id": ["emp_0965"]}}
+{"query": "List vendors used by Finance", "intent": "search", "entities": {"department": ["Finance"]}}
+{"query": "Find the Engineering department's onboarding docs", "intent": "search", "entities": {"department": ["Engineering"]}}
+{"query": "Find shipping orders for customer_id: blaus", "intent": "lookup", "entities": {"customer_id": ["blaus"]}}
+{"query": "How many tickets did Engineering close 2020-09-02?", "intent": "analytical", "entities": {"department": ["Engineering"], "date": ["2020-09-02"]}}
+{"query": "Find threads discussing the security incident", "intent": "search", "entities": {}}
+{"query": "What is the status of ticket 17226?", "intent": "lookup", "entities": {"ticket_id": ["17226"]}}
+{"query": "How many high-priority tickets does emp_1041 have?", "intent": "analytical", "entities": {"emp_id": ["emp_1041"]}}
+{"query": "Average resolution time for tickets in Sales", "intent": "analytical", "entities": {"department": ["Sales"]}}
+{"query": "Pull the issue description for ticket-6817", "intent": "lookup", "entities": {"ticket_id": ["6817"]}}
+{"query": "Who is the Engineering lead currently?", "intent": "search", "entities": {"department": ["Engineering"]}}
+{"query": "Pull the order placed by customer ernsh on Q1 2024", "intent": "lookup", "entities": {"customer_id": ["ernsh"], "date": ["Q1 2024"]}}
+{"query": "Show conversations involving emp_0688 from last month", "intent": "lookup", "entities": {"emp_id": ["emp_0688"], "date": ["last month"]}}
+{"query": "Edit the performance rating for emp_0393", "intent": "lookup", "entities": {"emp_id": ["emp_0393"]}}
+{"query": "Who is the Sales lead currently?", "intent": "search", "entities": {"department": ["Sales"]}}
+{"query": "Show me documentation owned by Business Development", "intent": "search", "entities": {"department": ["Business Development"]}}
+{"query": "Compare ticket counts for Information Technology and Information Technology", "intent": "analytical", "entities": {"department": ["Information Technology", "Information Technology"]}}
+{"query": "Send a message to emp_1119 about the deployment", "intent": "lookup", "entities": {"emp_id": ["emp_1119"]}}
+{"query": "What is the Sales team working on this quarter?", "intent": "search", "entities": {"department": ["Sales"]}}
+{"query": "What is the status of ticket 31422?", "intent": "lookup", "entities": {"ticket_id": ["31422"]}}
+{"query": "Show complaints filed by customer dracd", "intent": "lookup", "entities": {"customer_id": ["dracd"]}}
+{"query": "Tell emp_1100 that ticket 4076 is resolved", "intent": "lookup", "entities": {"emp_id": ["emp_1100"], "ticket_id": ["4076"]}}
+{"query": "Find emails between emp_0144 and emp_0678", "intent": "lookup", "entities": {"emp_id": ["emp_0144", "emp_0678"]}}
+{"query": "Find Business Development performance reviews", "intent": "search", "entities": {"department": ["Business Development"]}}
+{"query": "Find the budget for Engineering", "intent": "search", "entities": {"department": ["Engineering"]}}
+{"query": "Top 3 employees by ticket count in HR", "intent": "analytical", "entities": {"department": ["HR"]}}
+{"query": "Get the manager of employee emp_0974", "intent": "lookup", "entities": {"emp_id": ["emp_0974"]}}
+{"query": "hello", "intent": "ambiguous", "entities": {}}
+{"query": "Who handles HR escalations?", "intent": "search", "entities": {"department": ["HR"]}}
+{"query": "Find the Management department's onboarding docs", "intent": "search", "entities": {"department": ["Management"]}}
+{"query": "What is the BPO team working on this quarter?", "intent": "search", "entities": {"department": ["BPO"]}}
+{"query": "back", "intent": "ambiguous", "entities": {}}
+{"query": "How many products were updated 2018-12-02?", "intent": "analytical", "entities": {"date": ["2018-12-02"]}}
+{"query": "Show me complaints from the HR division", "intent": "search", "entities": {"department": ["HR"]}}
+{"query": "How many products were updated Q2 2024?", "intent": "analytical", "entities": {"date": ["Q2 2024"]}}
+{"query": "List all repositories owned by emp_1167", "intent": "lookup", "entities": {"emp_id": ["emp_1167"]}}
+{"query": "Find the Finance team's policy documents", "intent": "search", "entities": {"department": ["Finance"]}}
+{"query": "Pull recent posts from the Finance team", "intent": "search", "entities": {"department": ["Finance"]}}
+{"query": "Average customer rating for products in the BPO category", "intent": "analytical", "entities": {"department": ["BPO"]}}
+{"query": "Count tickets raised by emp_0048", "intent": "analytical", "entities": {"emp_id": ["emp_0048"]}}
+{"query": "Find emails between emp_1189 and emp_1244", "intent": "lookup", "entities": {"emp_id": ["emp_1189", "emp_1244"]}}
+{"query": "How many resumes were uploaded Q3 2024?", "intent": "analytical", "entities": {"date": ["Q3 2024"]}}
+{"query": "What is the status of ticket 27009?", "intent": "lookup", "entities": {"ticket_id": ["27009"]}}
+{"query": "the thing", "intent": "ambiguous", "entities": {}}
+{"query": "Edit the performance rating for emp_0543", "intent": "lookup", "entities": {"emp_id": ["emp_0543"]}}
+{"query": "Send a message from emp_0649 to emp_0149 about Q3 review", "intent": "lookup", "entities": {"emp_id": ["emp_0649", "emp_0149"]}}
+{"query": "Update the price of PHILIPS HL1655/00 to ₹999", "intent": "lookup", "entities": {"product": ["PHILIPS HL1655/00"]}}
+{"query": "Email emp_0452 from the Sales department about onboarding", "intent": "lookup", "entities": {"emp_id": ["emp_0452"], "department": ["Sales"]}}
+{"query": "Sum of leaves taken by Sales team Q1 2023", "intent": "analytical", "entities": {"department": ["Sales"], "date": ["Q1 2023"]}}
+{"query": "Edit the performance rating for emp_0538", "intent": "lookup", "entities": {"emp_id": ["emp_0538"]}}
+{"query": "Move emp_0150 to the Sales team", "intent": "lookup", "entities": {"emp_id": ["emp_0150"], "department": ["Sales"]}}
+{"query": "Surface emails from the Finance team", "intent": "search", "entities": {"department": ["Finance"]}}
+{"query": "List all repositories owned by emp_0103", "intent": "lookup", "entities": {"emp_id": ["emp_0103"]}}
+{"query": "Who manages HR?", "intent": "search", "entities": {"department": ["HR"]}}
+{"query": "Customer vaffe bought B092JHPL72 — pull the invoice", "intent": "lookup", "entities": {"customer_id": ["vaffe"], "product": ["B092JHPL72"]}}
+{"query": "How many high-priority tickets does emp_0285 have?", "intent": "analytical", "entities": {"emp_id": ["emp_0285"]}}
+{"query": "Resolve ticket 35181 please", "intent": "lookup", "entities": {"ticket_id": ["35181"]}}
+{"query": "Trend of email volume in Management", "intent": "analytical", "entities": {"department": ["Management"]}}
+{"query": "Notify emp_1133 about the new HR policy", "intent": "lookup", "entities": {"emp_id": ["emp_1133"]}}
+{"query": "How much did customer ocean spend FY24?", "intent": "analytical", "entities": {"customer_id": ["ocean"], "date": ["FY24"]}}
+{"query": "Find the Engineering team's policy documents", "intent": "search", "entities": {"department": ["Engineering"]}}
+{"query": "Who manages Business Development?", "intent": "search", "entities": {"department": ["Business Development"]}}
+{"query": "Who handles Sales escalations?", "intent": "search", "entities": {"department": ["Sales"]}}
+{"query": "Get the manager of employee emp_0906", "intent": "lookup", "entities": {"emp_id": ["emp_0906"]}}
+{"query": "List recent hires in Sales", "intent": "search", "entities": {"department": ["Sales"]}}
+{"query": "Pull invoice for customer_id hungc", "intent": "lookup", "entities": {"customer_id": ["hungc"]}}
+{"query": "Show me Business Development team chats", "intent": "search", "entities": {"department": ["Business Development"]}}
+{"query": "Get product details for boAt Wave", "intent": "lookup", "entities": {"product": ["boAt Wave"]}}
+{"query": "Get details of ticket id 45964", "intent": "lookup", "entities": {"ticket_id": ["45964"]}}
+{"query": "error message", "intent": "ambiguous", "entities": {}}
+{"query": "Compare ticket counts for Information Technology and Sales", "intent": "analytical", "entities": {"department": ["Information Technology", "Sales"]}}
+{"query": "Find Finance training materials", "intent": "search", "entities": {"department": ["Finance"]}}
+{"query": "Show complaints filed by customer maisd", "intent": "lookup", "entities": {"customer_id": ["maisd"]}}
+{"query": "Find the latest hire in Finance", "intent": "search", "entities": {"department": ["Finance"]}}
+{"query": "Show me documentation owned by Engineering", "intent": "search", "entities": {"department": ["Engineering"]}}
+{"query": "Find sales of B07B275VN9 this year", "intent": "lookup", "entities": {"product": ["B07B275VN9"]}}
+{"query": "Pull invoice for customer_id hilaa", "intent": "lookup", "entities": {"customer_id": ["hilaa"]}}
+{"query": "Update the price of Lenovo 130 to ₹999", "intent": "lookup", "entities": {"product": ["Lenovo 130"]}}
+{"query": "Find roadmap discussions about mobile app", "intent": "search", "entities": {}}
+{"query": "Find sales of B09H7JDJCW this year", "intent": "lookup", "entities": {"product": ["B09H7JDJCW"]}}
+{"query": "retry", "intent": "ambiguous", "entities": {}}
+{"query": "thanks", "intent": "ambiguous", "entities": {}}
+{"query": "Customer godos order history please", "intent": "lookup", "entities": {"customer_id": ["godos"]}}
+{"query": "What is the email of emp_0645?", "intent": "lookup", "entities": {"emp_id": ["emp_0645"]}}
+{"query": "Notify emp_1157 about the new HR policy", "intent": "lookup", "entities": {"emp_id": ["emp_1157"]}}
+{"query": "Sum of invoiced amounts for customer quede this month", "intent": "analytical", "entities": {"customer_id": ["quede"], "date": ["this month"]}}
+{"query": "List vendors used by Business Development", "intent": "search", "entities": {"department": ["Business Development"]}}
+{"query": "Show me reviews of product Havells Aqua", "intent": "lookup", "entities": {"product": ["Havells Aqua"]}}
+{"query": "Find the budget for BPO", "intent": "search", "entities": {"department": ["BPO"]}}
+{"query": "Show me threads about the conference talk submissions", "intent": "search", "entities": {}}
+{"query": "fix this", "intent": "ambiguous", "entities": {}}
+{"query": "Customer savea bought Zebronics ZEB-VITA — pull the invoice", "intent": "lookup", "entities": {"customer_id": ["savea"], "product": ["Zebronics ZEB-VITA"]}}
+{"query": "Get product details for B08HLZ28QC", "intent": "lookup", "entities": {"product": ["B08HLZ28QC"]}}
+{"query": "Edit the performance rating for emp_0086", "intent": "lookup", "entities": {"emp_id": ["emp_0086"]}}
+{"query": "Find the budget for Sales", "intent": "search", "entities": {"department": ["Sales"]}}
+{"query": "Find emails sent by emp_0381", "intent": "lookup", "entities": {"emp_id": ["emp_0381"]}}
+{"query": "Compare sales for emp_0091 and emp_0723 in January 2024", "intent": "analytical", "entities": {"emp_id": ["emp_0091", "emp_0723"], "date": ["January 2024"]}}
+{"query": "Show me ticket 60302", "intent": "lookup", "entities": {"ticket_id": ["60302"]}}
+{"query": "How much did customer quede spend Q3 2023?", "intent": "analytical", "entities": {"customer_id": ["quede"], "date": ["Q3 2023"]}}
+{"query": "xyz", "intent": "ambiguous", "entities": {}}
+{"query": "Compare sales for emp_0138 and emp_0484 in July 2023", "intent": "analytical", "entities": {"emp_id": ["emp_0138", "emp_0484"], "date": ["July 2023"]}}
+{"query": "Trend of B0B4T6MR8N sales over Q4 2024", "intent": "analytical", "entities": {"product": ["B0B4T6MR8N"], "date": ["Q4 2024"]}}
+{"query": "Who handles BPO escalations?", "intent": "search", "entities": {"department": ["BPO"]}}
+{"query": "Count messages sent by emp_0964 during this week", "intent": "analytical", "entities": {"emp_id": ["emp_0964"], "date": ["this week"]}}
+{"query": "Count of VPN outages over Q4 2024", "intent": "analytical", "entities": {"date": ["Q4 2024"]}}
+{"query": "Compare sales for emp_0543 and emp_0751 in FY23", "intent": "analytical", "entities": {"emp_id": ["emp_0543", "emp_0751"], "date": ["FY23"]}}
+{"query": "Show me the latest performance reviews", "intent": "search", "entities": {}}
+{"query": "Pull recent posts from the Sales team", "intent": "search", "entities": {"department": ["Sales"]}}
+{"query": "Find policy documents about remote work", "intent": "search", "entities": {}}
+{"query": "Compare emp_0871 and emp_0162 performance over 2024-03-15", "intent": "analytical", "entities": {"emp_id": ["emp_0871", "emp_0162"], "date": ["2024-03-15"]}}
+{"query": "?", "intent": "ambiguous", "entities": {}}
+{"query": "Total support chats by emp_0821 2023-10-04", "intent": "analytical", "entities": {"emp_id": ["emp_0821"], "date": ["2023-10-04"]}}
+{"query": "Find documentation on the API rate limits", "intent": "search", "entities": {}}
+{"query": "Show me Information Technology team chats", "intent": "search", "entities": {"department": ["Information Technology"]}}
+{"query": "hi", "intent": "ambiguous", "entities": {}}
+{"query": "Show me messages from the customer success channel", "intent": "search", "entities": {}}
+{"query": "Find sales of Sounce Gold this year", "intent": "lookup", "entities": {"product": ["Sounce Gold"]}}
+{"query": "Sum of invoiced amounts for customer linod last week", "intent": "analytical", "entities": {"customer_id": ["linod"], "date": ["last week"]}}
+{"query": "How many emails were sent Q3 2024?", "intent": "analytical", "entities": {"date": ["Q3 2024"]}}
+{"query": "Find emails between emp_0449 and emp_0361", "intent": "lookup", "entities": {"emp_id": ["emp_0449", "emp_0361"]}}
+{"query": "Open a new issue for emp_0302 in the repo", "intent": "lookup", "entities": {"emp_id": ["emp_0302"]}}
+{"query": "How many products were updated 2023-10-04?", "intent": "analytical", "entities": {"date": ["2023-10-04"]}}
+{"query": "Pull invoice for customer_id eastc", "intent": "lookup", "entities": {"customer_id": ["eastc"]}}
+{"query": "Compare revenue between dumon and santg in July 2023", "intent": "analytical", "entities": {"customer_id": ["dumon", "santg"], "date": ["July 2023"]}}
+{"query": "Average salary by department", "intent": "analytical", "entities": {}}
+{"query": "Show conversations involving emp_0971 from the past 30 days", "intent": "lookup", "entities": {"emp_id": ["emp_0971"], "date": ["the past 30 days"]}}
+{"query": "Search for resumes with React and TypeScript experience", "intent": "search", "entities": {}}
+{"query": "What is the status of ticket 20535?", "intent": "lookup", "entities": {"ticket_id": ["20535"]}}
+{"query": "What is the status of ticket 4870?", "intent": "lookup", "entities": {"ticket_id": ["4870"]}}
+{"query": "Find quarterly business review summaries", "intent": "search", "entities": {}}
+{"query": "Who handles Information Technology escalations?", "intent": "search", "entities": {"department": ["Information Technology"]}}
+{"query": "Count messages sent by emp_0221 during 2024-03-15", "intent": "analytical", "entities": {"emp_id": ["emp_0221"], "date": ["2024-03-15"]}}
+{"query": "Count of VPN outages over this week", "intent": "analytical", "entities": {"date": ["this week"]}}
+{"query": "Pull invoice for customer_id famia", "intent": "lookup", "entities": {"customer_id": ["famia"]}}
+{"query": "Get the manager of employee emp_0222", "intent": "lookup", "entities": {"emp_id": ["emp_0222"]}}
+{"query": "Find emails sent by emp_0583", "intent": "lookup", "entities": {"emp_id": ["emp_0583"]}}
+{"query": "Find the BPO department's onboarding docs", "intent": "search", "entities": {"department": ["BPO"]}}
+{"query": "Top 3 employees by ticket count in Management", "intent": "analytical", "entities": {"department": ["Management"]}}
+{"query": "Show me complaints from the Management division", "intent": "search", "entities": {"department": ["Management"]}}
+{"query": "Resolve ticket 12671 please", "intent": "lookup", "entities": {"ticket_id": ["12671"]}}
+{"query": "Average review rating for product B09PTT8DZF", "intent": "analytical", "entities": {"product": ["B09PTT8DZF"]}}
+{"query": "Find BPO performance reviews", "intent": "search", "entities": {"department": ["BPO"]}}
+{"query": "Pull invoice for customer_id thebi", "intent": "lookup", "entities": {"customer_id": ["thebi"]}}
+{"query": "Find escalation patterns in BPO", "intent": "search", "entities": {"department": ["BPO"]}}
+{"query": "Total support chats by emp_0004 March 2024", "intent": "analytical", "entities": {"emp_id": ["emp_0004"], "date": ["March 2024"]}}
+{"query": "How much did customer lonep spend this month?", "intent": "analytical", "entities": {"customer_id": ["lonep"], "date": ["this month"]}}
+{"query": "Find escalation patterns in Finance", "intent": "search", "entities": {"department": ["Finance"]}}
+{"query": "Show me Engineering team chats", "intent": "search", "entities": {"department": ["Engineering"]}}
+{"query": "Count tickets raised by emp_0953", "intent": "analytical", "entities": {"emp_id": ["emp_0953"]}}
+{"query": "Show me Finance team chats", "intent": "search", "entities": {"department": ["Finance"]}}
+{"query": "Find the Sales team's policy documents", "intent": "search", "entities": {"department": ["Sales"]}}
+{"query": "List recent hires in Information Technology", "intent": "search", "entities": {"department": ["Information Technology"]}}
+{"query": "Rank departments by ticket volume last week", "intent": "analytical", "entities": {"date": ["last week"]}}
+{"query": "Resolve ticket 30197 please", "intent": "lookup", "entities": {"ticket_id": ["30197"]}}
+{"query": "Show me reviews of product Smashtronics® -", "intent": "lookup", "entities": {"product": ["Smashtronics® -"]}}
+{"query": "got it", "intent": "ambiguous", "entities": {}}
+{"query": "Assign ticket 23492 to emp_0439", "intent": "lookup", "entities": {"ticket_id": ["23492"], "emp_id": ["emp_0439"]}}
+{"query": "Email emp_1049 from the Business Development department about onboarding", "intent": "lookup", "entities": {"emp_id": ["emp_1049"], "department": ["Business Development"]}}
+{"query": "Average resolution time for tickets in Management", "intent": "analytical", "entities": {"department": ["Management"]}}
+{"query": "Resolve ticket 88806 please", "intent": "lookup", "entities": {"ticket_id": ["88806"]}}
+{"query": "Count tickets raised by emp_0502", "intent": "analytical", "entities": {"emp_id": ["emp_0502"]}}
+{"query": "Show profile for emp_0155", "intent": "lookup", "entities": {"emp_id": ["emp_0155"]}}
+{"query": "more info", "intent": "ambiguous", "entities": {}}
+{"query": "Total sales of B01F262EUU yesterday", "intent": "analytical", "entities": {"product": ["B01F262EUU"], "date": ["yesterday"]}}
+{"query": "Show complaints filed by customer ricar", "intent": "lookup", "entities": {"customer_id": ["ricar"]}}
+{"query": "Find the Business Development department's onboarding docs", "intent": "search", "entities": {"department": ["Business Development"]}}
+{"query": "How many resumes were uploaded Q2 2023?", "intent": "analytical", "entities": {"date": ["Q2 2023"]}}
+{"query": "error", "intent": "ambiguous", "entities": {}}
+{"query": "Find escalation patterns in Information Technology", "intent": "search", "entities": {"department": ["Information Technology"]}}
+{"query": "status", "intent": "ambiguous", "entities": {}}
+{"query": "Average resolution time for tickets in Finance", "intent": "analytical", "entities": {"department": ["Finance"]}}
+{"query": "Show projects led by the Sales team", "intent": "search", "entities": {"department": ["Sales"]}}
+{"query": "Get product details for B099S26HWG", "intent": "lookup", "entities": {"product": ["B099S26HWG"]}}
+{"query": "admin", "intent": "ambiguous", "entities": {}}
+{"query": "Show me complaints from the Sales division", "intent": "search", "entities": {"department": ["Sales"]}}
+{"query": "Who handles Management escalations?", "intent": "search", "entities": {"department": ["Management"]}}
+{"query": "Assign ticket 42261 to emp_0830", "intent": "lookup", "entities": {"ticket_id": ["42261"], "emp_id": ["emp_0830"]}}
+{"query": "Find Management performance reviews", "intent": "search", "entities": {"department": ["Management"]}}
+{"query": "Surface emails from the Information Technology team", "intent": "search", "entities": {"department": ["Information Technology"]}}
+{"query": "List recent hires in Business Development", "intent": "search", "entities": {"department": ["Business Development"]}}
+{"query": "foo", "intent": "ambiguous", "entities": {}}
+{"query": "Show me complaints from the Information Technology division", "intent": "search", "entities": {"department": ["Information Technology"]}}
+{"query": "Trend of email volume in Finance", "intent": "analytical", "entities": {"department": ["Finance"]}}
+{"query": "info", "intent": "ambiguous", "entities": {}}
+{"query": "What is the Information Technology team working on this quarter?", "intent": "search", "entities": {"department": ["Information Technology"]}}
+{"query": "Assign ticket 66209 to emp_0820", "intent": "lookup", "entities": {"ticket_id": ["66209"], "emp_id": ["emp_0820"]}}
+{"query": "Show me reviews of product Havells Instanio", "intent": "lookup", "entities": {"product": ["Havells Instanio"]}}
+{"query": "Find docs about the customer onboarding process", "intent": "search", "entities": {}}
+{"query": "Compare sales for emp_0624 and emp_0338 in the past 30 days", "intent": "analytical", "entities": {"emp_id": ["emp_0624", "emp_0338"], "date": ["the past 30 days"]}}
+{"query": "List recent hires in Engineering", "intent": "search", "entities": {"department": ["Engineering"]}}
+{"query": "Find the latest hire in HR", "intent": "search", "entities": {"department": ["HR"]}}
+{"query": "Pull recent posts from the Information Technology team", "intent": "search", "entities": {"department": ["Information Technology"]}}
+{"query": "How many high-priority tickets does emp_0409 have?", "intent": "analytical", "entities": {"emp_id": ["emp_0409"]}}
+{"query": "again", "intent": "ambiguous", "entities": {}}
+{"query": "Customer support chats handled by emp_0404 on July 2023", "intent": "lookup", "entities": {"emp_id": ["emp_0404"], "date": ["July 2023"]}}
+{"query": "Count messages sent by emp_0328 during Q4 2024", "intent": "analytical", "entities": {"emp_id": ["emp_0328"], "date": ["Q4 2024"]}}
+{"query": "Find the latest hire in Management", "intent": "search", "entities": {"department": ["Management"]}}
+{"query": "Move emp_1085 to the BPO team", "intent": "lookup", "entities": {"emp_id": ["emp_1085"], "department": ["BPO"]}}
+{"query": "Average review rating for product boAt Deuce", "intent": "analytical", "entities": {"product": ["boAt Deuce"]}}
+{"query": "Search posts about diversity initiatives", "intent": "search", "entities": {}}
+{"query": "How many employees joined Sales Q1 2024?", "intent": "analytical", "entities": {"department": ["Sales"], "date": ["Q1 2024"]}}
+{"query": "Sum of leaves taken by Sales team July 2023", "intent": "analytical", "entities": {"department": ["Sales"], "date": ["July 2023"]}}
+{"query": "How many products were updated January 2024?", "intent": "analytical", "entities": {"date": ["January 2024"]}}
+{"query": "Find the latest hire in Business Development", "intent": "search", "entities": {"department": ["Business Development"]}}
+{"query": "List all repositories owned by emp_0846", "intent": "lookup", "entities": {"emp_id": ["emp_0846"]}}
+{"query": "Count tickets raised by emp_1056", "intent": "analytical", "entities": {"emp_id": ["emp_1056"]}}
+{"query": "Find escalation patterns in Sales", "intent": "search", "entities": {"department": ["Sales"]}}
+{"query": "Find the latest hire in BPO", "intent": "search", "entities": {"department": ["BPO"]}}
+{"query": "Find the budget for HR", "intent": "search", "entities": {"department": ["HR"]}}
+{"query": "Edit the performance rating for emp_1095", "intent": "lookup", "entities": {"emp_id": ["emp_1095"]}}
+{"query": "Who is the BPO lead currently?", "intent": "search", "entities": {"department": ["BPO"]}}
+{"query": "Who manages Sales?", "intent": "search", "entities": {"department": ["Sales"]}}
+{"query": "Sum of invoiced amounts for customer frans this week", "intent": "analytical", "entities": {"customer_id": ["frans"], "date": ["this week"]}}
+{"query": "List recent hires in Management", "intent": "search", "entities": {"department": ["Management"]}}
+{"query": "Find Sales performance reviews", "intent": "search", "entities": {"department": ["Sales"]}}
+{"query": "help", "intent": "ambiguous", "entities": {}}
+{"query": "Pull the chat between emp_0040 and emp_1106 on last week", "intent": "lookup", "entities": {"emp_id": ["emp_0040", "emp_1106"], "date": ["last week"]}}
+{"query": "Compare revenue between linod and blonp in last week", "intent": "analytical", "entities": {"customer_id": ["linod", "blonp"], "date": ["last week"]}}
+{"query": "Show me complaints from the Business Development division", "intent": "search", "entities": {"department": ["Business Development"]}}
+{"query": "What is the email of emp_0862?", "intent": "lookup", "entities": {"emp_id": ["emp_0862"]}}
+{"query": "Who manages BPO?", "intent": "search", "entities": {"department": ["BPO"]}}
+{"query": "forget it", "intent": "ambiguous", "entities": {}}
+{"query": "Trend of email volume in Business Development", "intent": "analytical", "entities": {"department": ["Business Development"]}}
+{"query": "How many high-priority tickets does emp_0742 have?", "intent": "analytical", "entities": {"emp_id": ["emp_0742"]}}
+{"query": "Compare revenue between thebi and ernsh in the past 30 days", "intent": "analytical", "entities": {"customer_id": ["thebi", "ernsh"], "date": ["the past 30 days"]}}
+{"query": "Tell emp_0674 that ticket 35181 is resolved", "intent": "lookup", "entities": {"emp_id": ["emp_0674"], "ticket_id": ["35181"]}}
+{"query": "open", "intent": "ambiguous", "entities": {}}
+{"query": "Compare profiles of emp_9004 and emp_1035", "intent": "lookup", "entities": {"emp_id": ["emp_9004", "emp_1035"]}}
+{"query": "Email emp_0082 from the Business Development department about onboarding", "intent": "lookup", "entities": {"emp_id": ["emp_0082"], "department": ["Business Development"]}}
+{"query": "Surface emails from the Business Development team", "intent": "search", "entities": {"department": ["Business Development"]}}
+{"query": "Who owns the inazuma analytics dashboard repository", "intent": "search", "entities": {}}
+{"query": "Edit the performance rating for emp_0953", "intent": "lookup", "entities": {"emp_id": ["emp_0953"]}}
+{"query": "Who manages Engineering?", "intent": "search", "entities": {"department": ["Engineering"]}}
+{"query": "everything", "intent": "ambiguous", "entities": {}}
+{"query": "Search HR strategy docs", "intent": "search", "entities": {"department": ["HR"]}}
+{"query": "Top 3 employees by ticket count in BPO", "intent": "analytical", "entities": {"department": ["BPO"]}}
+{"query": "How many resumes were uploaded 2021-12-30?", "intent": "analytical", "entities": {"date": ["2021-12-30"]}}
+{"query": "yes", "intent": "ambiguous", "entities": {}}
+{"query": "Pull the order placed by customer ottik on today", "intent": "lookup", "entities": {"customer_id": ["ottik"], "date": ["today"]}}
+{"query": "Pull invoice for customer_id magaa", "intent": "lookup", "entities": {"customer_id": ["magaa"]}}
+{"query": "Top 5 products by revenue last week", "intent": "analytical", "entities": {"date": ["last week"]}}
+{"query": "How many emails were sent FY24?", "intent": "analytical", "entities": {"date": ["FY24"]}}
+{"query": "Sum of invoiced amounts for customer savea today", "intent": "analytical", "entities": {"customer_id": ["savea"], "date": ["today"]}}
+{"query": "Find issues mentioning slow VPN connectivity", "intent": "search", "entities": {}}
+{"query": "Find emails between emp_0278 and emp_0947", "intent": "lookup", "entities": {"emp_id": ["emp_0278", "emp_0947"]}}
+{"query": "Show profile for emp_0220", "intent": "lookup", "entities": {"emp_id": ["emp_0220"]}}
+{"query": "Pull invoice for customer_id quick", "intent": "lookup", "entities": {"customer_id": ["quick"]}}
+{"query": "How much did customer merep spend last quarter?", "intent": "analytical", "entities": {"customer_id": ["merep"], "date": ["last quarter"]}}
+{"query": "List vendors used by BPO", "intent": "search", "entities": {"department": ["BPO"]}}
+{"query": "Who is emp_0726?", "intent": "lookup", "entities": {"emp_id": ["emp_0726"]}}
+{"query": "What was the agreed payment term in the last vendor contract for cloud services?", "intent": "search", "entities": {}}
+{"query": "Find the Information Technology department's onboarding docs", "intent": "search", "entities": {"department": ["Information Technology"]}}
+{"query": "Get details of ticket id 46980", "intent": "lookup", "entities": {"ticket_id": ["46980"]}}
+{"query": "Average ticket resolution time per department", "intent": "analytical", "entities": {}}
+{"query": "Find the Management team's policy documents", "intent": "search", "entities": {"department": ["Management"]}}
+{"query": "Find ticket 60745 raised by emp_0103 on Q3 2023", "intent": "lookup", "entities": {"ticket_id": ["60745"], "emp_id": ["emp_0103"], "date": ["Q3 2023"]}}
+{"query": "Find emails between emp_0996 and emp_0060", "intent": "lookup", "entities": {"emp_id": ["emp_0996", "emp_0060"]}}
+{"query": "Get GitHub commits from emp_0781 in 2021-12-30", "intent": "lookup", "entities": {"emp_id": ["emp_0781"], "date": ["2021-12-30"]}}
+{"query": "Who is the Finance lead currently?", "intent": "search", "entities": {"department": ["Finance"]}}
+{"query": "Email emp_0891 from the Information Technology department about onboarding", "intent": "lookup", "entities": {"emp_id": ["emp_0891"], "department": ["Information Technology"]}}
+{"query": "Who handles Engineering escalations?", "intent": "search", "entities": {"department": ["Engineering"]}}
+{"query": "How many emails were sent 2022-06-17?", "intent": "analytical", "entities": {"date": ["2022-06-17"]}}
+{"query": "How much did customer vinet spend the past 30 days?", "intent": "analytical", "entities": {"customer_id": ["vinet"], "date": ["the past 30 days"]}}
+{"query": "How many employees joined Management Q3 2023?", "intent": "analytical", "entities": {"department": ["Management"], "date": ["Q3 2023"]}}
+{"query": "What is the Management team working on this quarter?", "intent": "search", "entities": {"department": ["Management"]}}
+{"query": "Pull catalog entry for product_id B097MKZHNV", "intent": "lookup", "entities": {"product": ["B097MKZHNV"]}}
+{"query": "What is the HR team working on this quarter?", "intent": "search", "entities": {"department": ["HR"]}}
+{"query": "Average review rating for product SWAPKART Fast", "intent": "analytical", "entities": {"product": ["SWAPKART Fast"]}}
+{"query": "Compare ticket counts for Management and BPO", "intent": "analytical", "entities": {"department": ["Management", "BPO"]}}
+{"query": "Rank departments by ticket volume the past year", "intent": "analytical", "entities": {"date": ["the past year"]}}
+{"query": "Pull catalog entry for product_id B0BHYJ8CVF", "intent": "lookup", "entities": {"product": ["B0BHYJ8CVF"]}}
+{"query": "loading data", "intent": "ambiguous", "entities": {}}
+{"query": "Who is the Business Development lead currently?", "intent": "search", "entities": {"department": ["Business Development"]}}
+{"query": "What is the Business Development team working on this quarter?", "intent": "search", "entities": {"department": ["Business Development"]}}
+{"query": "makes sense", "intent": "ambiguous", "entities": {}}
+{"query": "Show me reviews of product B09HK9JH4F", "intent": "lookup", "entities": {"product": ["B09HK9JH4F"]}}
+{"query": "Show projects led by the HR team", "intent": "search", "entities": {"department": ["HR"]}}
+{"query": "Compare sales for emp_0199 and emp_0104 in Q2 2024", "intent": "analytical", "entities": {"emp_id": ["emp_0199", "emp_0104"], "date": ["Q2 2024"]}}
+{"query": "Move emp_0644 to the Business Development team", "intent": "lookup", "entities": {"emp_id": ["emp_0644"], "department": ["Business Development"]}}
+{"query": "List vendors used by Management", "intent": "search", "entities": {"department": ["Management"]}}
+{"query": "Show me BPO team chats", "intent": "search", "entities": {"department": ["BPO"]}}
+{"query": "Compare emp_0724 and emp_9009 performance over 2024-03-15", "intent": "analytical", "entities": {"emp_id": ["emp_0724", "emp_9009"], "date": ["2024-03-15"]}}
+{"query": "Compare revenue between specd and franr in July 2023", "intent": "analytical", "entities": {"customer_id": ["specd", "franr"], "date": ["July 2023"]}}
+{"query": "List vendors used by Information Technology", "intent": "search", "entities": {"department": ["Information Technology"]}}
+{"query": "Average resolution time for tickets in HR", "intent": "analytical", "entities": {"department": ["HR"]}}
+{"query": "Search Finance strategy docs", "intent": "search", "entities": {"department": ["Finance"]}}
+{"query": "Average customer rating for products in the Management category", "intent": "analytical", "entities": {"department": ["Management"]}}
+{"query": "How many high-priority tickets does emp_0277 have?", "intent": "analytical", "entities": {"emp_id": ["emp_0277"]}}
+{"query": "Find all support chats about coffee frother complaints", "intent": "search", "entities": {}}
+{"query": "submit", "intent": "ambiguous", "entities": {}}
+{"query": "Search Engineering strategy docs", "intent": "search", "entities": {"department": ["Engineering"]}}
+{"query": "Show me complaints from the BPO division", "intent": "search", "entities": {"department": ["BPO"]}}
+{"query": "Find escalation patterns in HR", "intent": "search", "entities": {"department": ["HR"]}}
+{"query": "Rank departments by ticket volume last month", "intent": "analytical", "entities": {"date": ["last month"]}}
+{"query": "Trend of B00LZLQ624 sales over October 2022", "intent": "analytical", "entities": {"product": ["B00LZLQ624"], "date": ["October 2022"]}}
+{"query": "Compare profiles of emp_0907 and emp_0438", "intent": "lookup", "entities": {"emp_id": ["emp_0907", "emp_0438"]}}
+{"query": "Count messages sent by emp_0152 during 2023-10-04", "intent": "analytical", "entities": {"emp_id": ["emp_0152"], "date": ["2023-10-04"]}}
+{"query": "Average review rating for product B008YW8M0G", "intent": "analytical", "entities": {"product": ["B008YW8M0G"]}}
+{"query": "Find Engineering training materials", "intent": "search", "entities": {"department": ["Engineering"]}}
+{"query": "Did emp_0515 send any emails on last week?", "intent": "lookup", "entities": {"emp_id": ["emp_0515"], "date": ["last week"]}}
+{"query": "Update the price of B09BF8JBWX to ₹999", "intent": "lookup", "entities": {"product": ["B09BF8JBWX"]}}
+{"query": "Find emails about the Q1 hiring freeze", "intent": "search", "entities": {}}
+{"query": "Find HR training materials", "intent": "search", "entities": {"department": ["HR"]}}
+{"query": "Did emp_0490 send any emails on Q1 2024?", "intent": "lookup", "entities": {"emp_id": ["emp_0490"], "date": ["Q1 2024"]}}
+{"query": "Find Business Development training materials", "intent": "search", "entities": {"department": ["Business Development"]}}
+{"query": "dashboard", "intent": "ambiguous", "entities": {}}
+{"query": "Find emails between emp_0004 and emp_1066", "intent": "lookup", "entities": {"emp_id": ["emp_0004", "emp_1066"]}}
+{"query": "Search Information Technology strategy docs", "intent": "search", "entities": {"department": ["Information Technology"]}}
+{"query": "Send a message from emp_0853 to emp_0128 about Q3 review", "intent": "lookup", "entities": {"emp_id": ["emp_0853", "emp_0128"]}}
+{"query": "Find escalation patterns in Business Development", "intent": "search", "entities": {"department": ["Business Development"]}}
+{"query": "Count messages sent by emp_0655 during March 2024", "intent": "analytical", "entities": {"emp_id": ["emp_0655"], "date": ["March 2024"]}}
+{"query": "okay", "intent": "ambiguous", "entities": {}}
+{"query": "Compare ticket counts for Engineering and Engineering", "intent": "analytical", "entities": {"department": ["Engineering", "Engineering"]}}
+{"query": "null", "intent": "ambiguous", "entities": {}}
+{"query": "Find escalation patterns in Engineering", "intent": "search", "entities": {"department": ["Engineering"]}}
+{"query": "Show projects led by the Business Development team", "intent": "search", "entities": {"department": ["Business Development"]}}
+{"query": "Find Information Technology performance reviews", "intent": "search", "entities": {"department": ["Information Technology"]}}
+{"query": "Sum of leaves taken by Sales team the past year", "intent": "analytical", "entities": {"department": ["Sales"], "date": ["the past year"]}}
+{"query": "Average review rating for product Ikea Little", "intent": "analytical", "entities": {"product": ["Ikea Little"]}}
+{"query": "ok thanks", "intent": "ambiguous", "entities": {}}
+{"query": "Open a new issue for emp_0042 in the repo", "intent": "lookup", "entities": {"emp_id": ["emp_0042"]}}
+{"query": "Who manages Finance?", "intent": "search", "entities": {"department": ["Finance"]}}
+{"query": "Assign ticket 8264 to emp_0390", "intent": "lookup", "entities": {"ticket_id": ["8264"], "emp_id": ["emp_0390"]}}
+{"query": "Get product details for B099Z83VRC", "intent": "lookup", "entities": {"product": ["B099Z83VRC"]}}
+{"query": "Total sales of B081NHWT6Z 2018-12-02", "intent": "analytical", "entities": {"product": ["B081NHWT6Z"], "date": ["2018-12-02"]}}
+{"query": "Total sales of B07YTNKVJQ this year", "intent": "analytical", "entities": {"product": ["B07YTNKVJQ"], "date": ["this year"]}}
+{"query": "How many tickets did Information Technology close July 2023?", "intent": "analytical", "entities": {"department": ["Information Technology"], "date": ["July 2023"]}}
+{"query": "Compare profiles of emp_0532 and emp_0507", "intent": "lookup", "entities": {"emp_id": ["emp_0532", "emp_0507"]}}
+{"query": "Find Management training materials", "intent": "search", "entities": {"department": ["Management"]}}
+{"query": "Resolve ticket 51450 please", "intent": "lookup", "entities": {"ticket_id": ["51450"]}}
+{"query": "Find the latest hire in Engineering", "intent": "search", "entities": {"department": ["Engineering"]}}
+{"query": "Pull recent posts from the Business Development team", "intent": "search", "entities": {"department": ["Business Development"]}}
+{"query": "Compare profiles of emp_1114 and emp_0621", "intent": "lookup", "entities": {"emp_id": ["emp_1114", "emp_0621"]}}
+{"query": "Sum of leaves taken by Business Development team Q2 2024", "intent": "analytical", "entities": {"department": ["Business Development"], "date": ["Q2 2024"]}}
+{"query": "Show me ticket 45094", "intent": "lookup", "entities": {"ticket_id": ["45094"]}}
+{"query": "Pull the order placed by customer lacor on this quarter", "intent": "lookup", "entities": {"customer_id": ["lacor"], "date": ["this quarter"]}}
+{"query": "How much did customer blaus spend this week?", "intent": "analytical", "entities": {"customer_id": ["blaus"], "date": ["this week"]}}
+{"query": "Compare sales for emp_1246 and emp_0899 in this week", "intent": "analytical", "entities": {"emp_id": ["emp_1246", "emp_0899"], "date": ["this week"]}}
+{"query": "Trend of customer complaints over 2020-09-02", "intent": "analytical", "entities": {"date": ["2020-09-02"]}}
+{"query": "Total support chats by emp_0228 Q2 2024", "intent": "analytical", "entities": {"emp_id": ["emp_0228"], "date": ["Q2 2024"]}}
+{"query": "Show me Management team chats", "intent": "search", "entities": {"department": ["Management"]}}
+{"query": "What is the email of emp_1038?", "intent": "lookup", "entities": {"emp_id": ["emp_1038"]}}
+{"query": "How many tickets did HR close Q1 2023?", "intent": "analytical", "entities": {"department": ["HR"], "date": ["Q1 2023"]}}
+{"query": "What is the status of ticket 2616?", "intent": "lookup", "entities": {"ticket_id": ["2616"]}}
+{"query": "Show me ticket 42237", "intent": "lookup", "entities": {"ticket_id": ["42237"]}}
+{"query": "Show profile for emp_0936", "intent": "lookup", "entities": {"emp_id": ["emp_0936"]}}
+{"query": "Assign ticket 85220 to emp_0041", "intent": "lookup", "entities": {"ticket_id": ["85220"], "emp_id": ["emp_0041"]}}
+{"query": "Customer warth bought Themisto TH-WS20 — pull the invoice", "intent": "lookup", "entities": {"customer_id": ["warth"], "product": ["Themisto TH-WS20"]}}
+{"query": "query", "intent": "ambiguous", "entities": {}}
+{"query": "close", "intent": "ambiguous", "entities": {}}
+{"query": "Average resolution time for tickets in Business Development", "intent": "analytical", "entities": {"department": ["Business Development"]}}
+{"query": "Sum of leaves taken by Engineering team Q2 2024", "intent": "analytical", "entities": {"department": ["Engineering"], "date": ["Q2 2024"]}}
+{"query": "List vendors used by HR", "intent": "search", "entities": {"department": ["HR"]}}
+{"query": "Rank departments by ticket volume this week", "intent": "analytical", "entities": {"date": ["this week"]}}
+{"query": "How many high-priority tickets does emp_0833 have?", "intent": "analytical", "entities": {"emp_id": ["emp_0833"]}}
+{"query": "Resolve ticket 717 please", "intent": "lookup", "entities": {"ticket_id": ["717"]}}
+{"query": "Send a message from emp_0718 to emp_0627 about Q3 review", "intent": "lookup", "entities": {"emp_id": ["emp_0718", "emp_0627"]}}
+{"query": "Total sales of B07DZ986Q2 this year", "intent": "analytical", "entities": {"product": ["B07DZ986Q2"], "date": ["this year"]}}
+{"query": "Rank departments by ticket volume Q4 2023", "intent": "analytical", "entities": {"date": ["Q4 2023"]}}
+{"query": "Average review rating for product B08D77XZX5", "intent": "analytical", "entities": {"product": ["B08D77XZX5"]}}
+{"query": "the page", "intent": "ambiguous", "entities": {}}
+{"query": "What is the status of ticket 12909?", "intent": "lookup", "entities": {"ticket_id": ["12909"]}}
+{"query": "Send a message from emp_0671 to emp_0693 about Q3 review", "intent": "lookup", "entities": {"emp_id": ["emp_0671", "emp_0693"]}}
+{"query": "Update the price of HP GK320 to ₹999", "intent": "lookup", "entities": {"product": ["HP GK320"]}}
+{"query": "Find the budget for Information Technology", "intent": "search", "entities": {"department": ["Information Technology"]}}
+{"query": "Show me HR team chats", "intent": "search", "entities": {"department": ["HR"]}}
+{"query": "Show me reviews of product Elv Aluminium", "intent": "lookup", "entities": {"product": ["Elv Aluminium"]}}
+{"query": "Send a message to emp_0474 about the deployment", "intent": "lookup", "entities": {"emp_id": ["emp_0474"]}}
+{"query": "How much did customer specd spend this quarter?", "intent": "analytical", "entities": {"customer_id": ["specd"], "date": ["this quarter"]}}
+{"query": "Find the resume for the senior backend engineer with kubernetes experience", "intent": "search", "entities": {}}
+{"query": "Find the Information Technology team's policy documents", "intent": "search", "entities": {"department": ["Information Technology"]}}
+{"query": "Show me complaints from the Engineering division", "intent": "search", "entities": {"department": ["Engineering"]}}
+{"query": "List recent hires in BPO", "intent": "search", "entities": {"department": ["BPO"]}}
