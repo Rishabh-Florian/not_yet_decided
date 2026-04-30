@@ -22,10 +22,8 @@ export interface GNode {
   degree: number;
   timestamp: number | null;
   source: string | null;
-  // Subgraph facets — populated from attributes
   department: string | null;
   location: string | null;
-  // For Organization nodes: "Department" | "Location" | null
   orgSubtype: string | null;
 }
 
@@ -86,14 +84,30 @@ function nodeVal(raw: RawNode): number {
   return MESSAGE_SIZE;
 }
 
+const DEPT_TO_LOCATION: Record<string, string> = {
+  "Engineering":            "San Francisco",
+  "Information Technology": "Austin",
+  "Finance":                "New York",
+  "Business Development":   "London",
+  "Sales":                  "Chicago",
+  "BPO":                    "Manila",
+  "HR":                     "Seattle",
+  "Management":             "Boston",
+};
+
+function derivedLocation(category: string | null): string | null {
+  if (!category) return null;
+  return DEPT_TO_LOCATION[category] ?? null;
+}
+
 async function fetchCommunicationGraph(): Promise<GraphData> {
-  const [sentResult, memberOfResult] = await Promise.all([
+  const [sentResult, receivedResult] = await Promise.all([
     apiPost<PatternQueryResponse>("/api/graph/query", {
       pattern: "(Person)-[SENT]->(Message)",
-      limit: 150,
+      limit: 500,
     }),
     apiPost<PatternQueryResponse>("/api/graph/query", {
-      pattern: "(Person)-[MEMBER_OF]->(Organization)",
+      pattern: "(Message)-[RECEIVED]->(Person)",
       limit: 500,
     }),
   ]);
@@ -104,6 +118,7 @@ async function fetchCommunicationGraph(): Promise<GraphData> {
   function addNode(raw: RawNode) {
     if (nodeMap.has(raw.id)) return;
     const a = raw.attributes;
+    const category = typeof a.category === "string" ? a.category : null;
     nodeMap.set(raw.id, {
       id: raw.id,
       type: raw.type,
@@ -113,8 +128,8 @@ async function fetchCommunicationGraph(): Promise<GraphData> {
       degree: 0,
       timestamp: deriveTimestamp(raw),
       source: deriveSource(raw),
-      department: typeof a.category === "string" ? a.category : null,
-      location: typeof a.office_location === "string" ? a.office_location : null,
+      department: category,
+      location: typeof a.office_location === "string" ? a.office_location : derivedLocation(category),
       orgSubtype: typeof a.subtype === "string" ? a.subtype : null,
     });
   }
@@ -132,10 +147,53 @@ async function fetchCommunicationGraph(): Promise<GraphData> {
     addLink(m.source.id, m.target.id, m.edge.relation_type);
   }
 
-  for (const m of memberOfResult.matches) {
+  for (const m of receivedResult.matches) {
     addNode(m.source as RawNode);
     addNode(m.target as RawNode);
     addLink(m.source.id, m.target.id, m.edge.relation_type);
+  }
+
+  // Synthesize Department and Location org nodes from Person attributes.
+  const personNodes = Array.from(nodeMap.values()).filter((n) => n.type === "Person");
+  for (const node of personNodes) {
+    if (node.department) {
+      const deptId = `org:dept:${node.department}`;
+      if (!nodeMap.has(deptId)) {
+        nodeMap.set(deptId, {
+          id: deptId,
+          type: "Organization",
+          name: node.department,
+          val: ORG_SIZE,
+          color: ORG_DEPT_COLOR,
+          degree: 0,
+          timestamp: null,
+          source: null,
+          department: node.department,
+          location: null,
+          orgSubtype: "Department",
+        });
+      }
+      addLink(node.id, deptId, "MEMBER_OF");
+    }
+    if (node.location) {
+      const locId = `org:loc:${node.location}`;
+      if (!nodeMap.has(locId)) {
+        nodeMap.set(locId, {
+          id: locId,
+          type: "Organization",
+          name: node.location,
+          val: ORG_SIZE,
+          color: ORG_LOC_COLOR,
+          degree: 0,
+          timestamp: null,
+          source: null,
+          department: null,
+          location: node.location,
+          orgSubtype: "Location",
+        });
+      }
+      addLink(node.id, locId, "MEMBER_OF");
+    }
   }
 
   linkMap.forEach((link) => {
